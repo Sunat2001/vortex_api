@@ -1,0 +1,447 @@
+openapi: 3.0.0
+info:
+  title: Voronka API
+  description: API для управления таргетированной рекламой, чатами и агентами в рамках проекта «Воронка».
+  version: 1.0.0
+
+servers:
+  - url: https://api.voronka.ai/v1
+    description: Production server
+
+tags:
+  - name: Agents
+    description: Управление персоналом и их эффективностью
+  - name: RBAC
+    description: Роли и права доступа
+  - name: Chats
+    description: Работа с диалогами и сообщениями
+  - name: Webhooks
+    description: Прием вебхуков от внешних платформ (Facebook, Instagram, WhatsApp)
+  - name: Ads
+    description: Таргетированная реклама и аналитика
+  - name: Catalog
+    description: Универсальный каталог продуктов/услуг
+
+paths:
+  # --- AGENTS ---
+  /agents/invite:
+    post:
+      tags: [Agents]
+      summary: Пригласить нового агента
+      responses:
+        201:
+          description: Приглашение отправлено
+  /agents:
+    get:
+      tags: [Agents]
+      summary: Список всех агентов
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [online, offline, busy]
+      responses:
+        200:
+          description: Список агентов
+  /agents/me/status:
+    patch:
+      tags: [Agents]
+      summary: Изменить текущий статус (online/busy/offline)
+      responses:
+        200:
+          description: Статус обновлен
+  /agents/workload:
+    get:
+      tags: [Agents]
+      summary: Нагрузка на агентов (количество активных чатов)
+      responses:
+        200:
+          description: Отчет по нагрузке
+
+  # --- RBAC ---
+  /roles:
+    get:
+      tags: [RBAC]
+      summary: Получить все роли
+    post:
+      tags: [RBAC]
+      summary: Создать новую роль
+  /permissions:
+    get:
+      tags: [RBAC]
+      summary: Список всех доступных прав системы
+
+  # --- CHATS ---
+  /chats:
+    get:
+      tags: [Chats]
+      summary: Список активных диалогов
+      parameters:
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, pending, closed]
+      responses:
+        200:
+          description: Список диалогов
+  /chats/{id}/events:
+    get:
+      tags: [ Chats ]
+      summary: Получить историю событий диалога (Audit Log)
+      description: Возвращает хронологическую последовательность всех изменений диалога (назначения, смены статусов, передачи между агентами).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: UUID диалога
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Список событий диалога
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DialogEvent'
+        404:
+          description: Диалог не найден
+  components:
+    schemas:
+      DialogEvent:
+        type: object
+        properties:
+          id:
+            type: string
+            format: uuid
+          event_type:
+            type: string
+            enum: [ created, assigned, transferred, status_changed, ai_draft_generated, priority_escalated, closed ]
+            example: transferred
+          actor_id:
+            type: string
+            format: uuid
+            nullable: true
+            description: ID агента, совершившего действие. NULL если действие совершено системой или AI.
+          payload:
+            type: object
+            description: Дополнительные данные события (например, старый и новый статус)
+            example:
+              from_agent: "UUID-1"
+              to_agent: "UUID-2"
+              reason: "shift_end"
+          created_at:
+            type: string
+            format: date-time
+  /chats/{id}/messages:
+    get:
+      tags: [Chats]
+      summary: История сообщений в диалоге
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+    post:
+      tags: [Chats]
+      summary: Отправить сообщение (в очередь Redis Outbound)
+      responses:
+        202:
+          description: Сообщение принято в обработку
+  /chats/{id}/assign:
+    patch:
+      tags: [Chats]
+      summary: Назначить агента на диалог
+  /chats/{id}/transfer:
+    post:
+      tags: [Chats]
+      summary: Передать диалог другому агенту
+
+  # --- WEBHOOKS ---
+  /webhooks/facebook:
+    get:
+      tags: [Webhooks]
+      summary: Верификация вебхука Facebook (Meta)
+      description: Обрабатывает запрос на подтверждение подписки от Meta платформы
+      parameters:
+        - name: hub.mode
+          in: query
+          required: true
+          description: Режим подписки (должен быть "subscribe")
+          schema:
+            type: string
+            enum: [subscribe]
+        - name: hub.verify_token
+          in: query
+          required: true
+          description: Токен верификации (настраивается через WEBHOOKS_FACEBOOK_VERIFYTOKEN)
+          schema:
+            type: string
+        - name: hub.challenge
+          in: query
+          required: true
+          description: Строка-вызов от Meta для подтверждения
+          schema:
+            type: string
+      responses:
+        200:
+          description: Верификация успешна, возвращается hub.challenge
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "1234567890"
+        403:
+          description: Верификация не удалась (неверный токен)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "verification failed"
+      security: []
+    post:
+      tags: [Webhooks]
+      summary: Прием событий от Facebook
+      description: Принимает вебхук-события от Facebook, проверяет HMAC-подпись, отправляет в Redis Stream
+      parameters:
+        - name: X-Hub-Signature-256
+          in: header
+          required: true
+          description: HMAC-SHA256 подпись тела запроса
+          schema:
+            type: string
+            example: "sha256=abc123..."
+      requestBody:
+        required: true
+        description: Сырой JSON-payload от Facebook (формат зависит от типа события)
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw Facebook webhook payload
+              example:
+                object: "page"
+                entry:
+                  - id: "PAGE_ID"
+                    time: 1234567890
+                    messaging:
+                      - sender:
+                          id: "USER_ID"
+                        recipient:
+                          id: "PAGE_ID"
+                        timestamp: 1234567890
+                        message:
+                          text: "Hello"
+      responses:
+        200:
+          description: Вебхук принят и поставлен в очередь обработки
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "received"
+        401:
+          description: Неверная подпись (X-Hub-Signature-256)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "invalid signature"
+        500:
+          description: Ошибка при постановке в очередь Redis
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "failed to process webhook"
+      security: []
+
+  /webhooks/instagram:
+    get:
+      tags: [Webhooks]
+      summary: Верификация вебхука Instagram (Meta)
+      description: Обрабатывает запрос на подтверждение подписки от Meta платформы
+      parameters:
+        - name: hub.mode
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [subscribe]
+        - name: hub.verify_token
+          in: query
+          required: true
+          description: Токен верификации (настраивается через WEBHOOKS_INSTAGRAM_VERIFYTOKEN)
+          schema:
+            type: string
+        - name: hub.challenge
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Верификация успешна
+          content:
+            text/plain:
+              schema:
+                type: string
+        403:
+          description: Верификация не удалась
+      security: []
+    post:
+      tags: [Webhooks]
+      summary: Прием событий от Instagram
+      description: Принимает вебхук-события от Instagram, проверяет HMAC-подпись, отправляет в Redis Stream
+      parameters:
+        - name: X-Hub-Signature-256
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        200:
+          description: Вебхук принят
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "received"
+        401:
+          description: Неверная подпись
+        500:
+          description: Ошибка обработки
+      security: []
+
+  /webhooks/whatsapp:
+    get:
+      tags: [Webhooks]
+      summary: Верификация вебхука WhatsApp (Meta)
+      description: Обрабатывает запрос на подтверждение подписки от Meta платформы
+      parameters:
+        - name: hub.mode
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [subscribe]
+        - name: hub.verify_token
+          in: query
+          required: true
+          description: Токен верификации (настраивается через WEBHOOKS_WHATSAPP_VERIFYTOKEN)
+          schema:
+            type: string
+        - name: hub.challenge
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Верификация успешна
+          content:
+            text/plain:
+              schema:
+                type: string
+        403:
+          description: Верификация не удалась
+      security: []
+    post:
+      tags: [Webhooks]
+      summary: Прием событий от WhatsApp
+      description: Принимает вебхук-события от WhatsApp, проверяет HMAC-подпись, отправляет в Redis Stream
+      parameters:
+        - name: X-Hub-Signature-256
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        200:
+          description: Вебхук принят
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "received"
+        401:
+          description: Неверная подпись
+        500:
+          description: Ошибка обработки
+      security: []
+
+  # --- ADS ---
+  /ads/dashboard:
+    get:
+      tags: [Ads]
+      summary: Сводная аналитика (Spend, Leads, CAC, ROAS)
+  /ads/campaigns:
+    get:
+      tags: [Ads]
+      summary: Список рекламных кампаний
+    post:
+      tags: [Ads]
+      summary: Создать новую кампанию (в очередь Redis Ads Tasks)
+  /ads/campaigns/{id}/insights:
+    get:
+      tags: [Ads]
+      summary: Детальная видео-статистика и ликвидность
+  /ads/liquidity:
+    get:
+      tags: [Ads]
+      summary: Глобальный отчет по "здоровью" рекламных алгоритмов
+
+  # --- CATALOG ---
+  /catalog:
+    get:
+      tags: [Catalog]
+      summary: Поиск товаров/услуг
+    post:
+      tags: [Catalog]
+      summary: Добавить новую позицию в каталог (с attributes JSONB)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

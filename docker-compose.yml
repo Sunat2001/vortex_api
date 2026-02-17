@@ -1,0 +1,180 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: voronka-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: voronka
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./tables.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d voronka"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - voronka-network
+
+  # Redis Cache & Streams
+  redis:
+    image: redis:7-alpine
+    container_name: voronka-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - voronka-network
+
+  # API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    container_name: voronka-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Server
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      SERVER_SHUTDOWNTIMEOUT: 10s
+
+      # Database
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_DATABASE: voronka
+      DATABASE_SSLMODE: disable
+      DATABASE_MAXOPENCONNS: 25
+      DATABASE_MAXIDLECONNS: 5
+      DATABASE_CONNMAXLIFETIME: 30m
+      DATABASE_CONNMAXIDLETIME: 5m
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_POOLSIZE: 10
+      REDIS_MINIDLECONNS: 2
+      REDIS_MAXRETRIES: 3
+      REDIS_DIALTIMEOUT: 5s
+      REDIS_READTIMEOUT: 3s
+      REDIS_WRITETIMEOUT: 3s
+      REDIS_STREAMMAXLEN: 10000
+      REDIS_CONSUMERGROUP: voronka-workers
+      REDIS_CONSUMERBLOCKTIME: 2s
+
+      # Logger
+      LOGGER_LEVEL: debug
+      LOGGER_DEVELOPMENT: true
+      LOGGER_ENCODING: console
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - voronka-network
+
+  # Background Workers
+  workers:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: workers
+    container_name: voronka-workers
+    restart: unless-stopped
+    environment:
+      # Database
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_DATABASE: voronka
+      DATABASE_SSLMODE: disable
+      DATABASE_MAXOPENCONNS: 25
+      DATABASE_MAXIDLECONNS: 5
+      DATABASE_CONNMAXLIFETIME: 30m
+      DATABASE_CONNMAXIDLETIME: 5m
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_POOLSIZE: 10
+      REDIS_MINIDLECONNS: 2
+      REDIS_MAXRETRIES: 3
+      REDIS_DIALTIMEOUT: 5s
+      REDIS_READTIMEOUT: 3s
+      REDIS_WRITETIMEOUT: 3s
+      REDIS_STREAMMAXLEN: 10000
+      REDIS_CONSUMERGROUP: voronka-workers
+      REDIS_CONSUMERBLOCKTIME: 2s
+
+      # Logger
+      LOGGER_LEVEL: debug
+      LOGGER_DEVELOPMENT: true
+      LOGGER_ENCODING: console
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - voronka-network
+
+  # Redis Commander (Optional - Redis GUI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: voronka-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - voronka-network
+    profiles:
+      - tools
+
+networks:
+  voronka-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

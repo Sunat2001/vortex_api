@@ -1,0 +1,10 @@
+DROP INDEX IF EXISTS idx_catalog_attributes;
+DROP INDEX IF EXISTS idx_catalog_type_category;
+DROP INDEX IF EXISTS idx_lead_events_platform_id;
+DROP INDEX IF EXISTS idx_ads_external_id;
+DROP INDEX IF EXISTS idx_ad_performance_date;
+DROP INDEX IF EXISTS idx_contacts_email;
+DROP INDEX IF EXISTS idx_contacts_external_id;
+DROP INDEX IF EXISTS idx_dialogs_status;
+DROP INDEX IF EXISTS idx_messages_dialog_at;
+DROP INDEX IF EXISTS idx_dialog_events_dialog_id;

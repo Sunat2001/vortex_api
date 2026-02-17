@@ -1,0 +1,225 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36" version="29.3.2">
+  <diagram id="mcp_ai_arch" name="Go Monolith + MCP AI">
+    <mxGraphModel dx="617" dy="1589" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-15" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="730" width="800" x="15" y="-1160" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-16" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="&lt;font style=&quot;font-size: 36px;&quot;&gt;Архитектура обработки входяших сообщений&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="800" x="11" y="-1151" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-17" parent="1" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#f5f5f5;" value="Messenger Platforms&lt;br&gt;(TG, WA, Meta Ads)" vertex="1">
+          <mxGeometry height="90" width="180" x="11" y="-1030" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-18" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="sAfq6NbjnnomDAzrktZJ-38">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;Go Ingress&lt;/b&gt;&lt;br&gt;Webhook Receiver" vertex="1">
+          <mxGeometry height="60" width="140" x="211" y="-1015" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-21" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="&lt;div&gt;&lt;span style=&quot;color: rgba(0, 0, 0, 0); font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bb%26gt%3BWorker%20Pool%20(Go)%26lt%3B%2Fb%26gt%3B%26lt%3Bbr%26gt%3BConsumer%20Groups%26lt%3Bbr%26gt%3BXREADGROUP%20%2B%20ACK%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3BfillColor%3D%23d5e8d4%3BstrokeColor%3D%2382b366%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%22540%22%20y%3D%22340%22%20width%3D%22180%22%20height%3D%2270%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;b&gt;&lt;/b&gt;&lt;/div&gt;&lt;b&gt;AI Orchestrator&lt;/b&gt;&lt;br&gt;&lt;div&gt;&lt;b&gt;Worker Pool (Go)&lt;/b&gt;&lt;br&gt;Consumer Groups&lt;br&gt;XREADGROUP + ACK&lt;/div&gt;" vertex="1">
+          <mxGeometry height="80" width="170" x="381" y="-775" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-22" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="&lt;b&gt;MCP Server Layer&lt;/b&gt;&lt;br&gt;(Tool Definitions)&lt;br&gt;GetProduct(), CheckStock()&lt;br&gt;AnalyzeSales()" vertex="1">
+          <mxGeometry height="80" width="190" x="571" y="-775" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-23" parent="1" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="&lt;b&gt;PostgreSQL&lt;/b&gt;" vertex="1">
+          <mxGeometry height="150" width="200" x="581" y="-631" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-24" parent="sAfq6NbjnnomDAzrktZJ-23" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" value="Messages &amp; Dialogs" vertex="1">
+          <mxGeometry height="30" width="130" x="35" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-25" parent="sAfq6NbjnnomDAzrktZJ-23" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontColor=#660000;" value="&lt;u&gt;Product Data &amp; ERP&lt;/u&gt;" vertex="1">
+          <mxGeometry height="30" width="130" x="35" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-26" parent="1" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" value="LLM (Claude 3.5 / GPT-4o)&lt;br&gt;Reasoning Engine" vertex="1">
+          <mxGeometry height="100" width="200" x="366" y="-605" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-27" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;" value="WebSocket Hub" vertex="1">
+          <mxGeometry height="60" width="120" x="211" y="-765" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-28" parent="1" style="device;whiteSpace=wrap;html=1;" value="Agent UI (v0)&lt;br&gt;(Drafts, Smart Sorting)" vertex="1">
+          <mxGeometry height="100" width="140" x="31" y="-785" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-29" edge="1" parent="1" target="sAfq6NbjnnomDAzrktZJ-19">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="181" y="-985" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-30" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-21" target="sAfq6NbjnnomDAzrktZJ-26">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint value="Prompt + Tools List" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-31" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-26" target="sAfq6NbjnnomDAzrktZJ-22">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint value="Tool Call (MCP)" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-32" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-22" target="sAfq6NbjnnomDAzrktZJ-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-33" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-21" target="sAfq6NbjnnomDAzrktZJ-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-34" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-27" target="sAfq6NbjnnomDAzrktZJ-28">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-35" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-21" target="sAfq6NbjnnomDAzrktZJ-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-36" parent="1" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;startSize=23;" value="REDIS INSTANCE (Memory Optimized)" vertex="1">
+          <mxGeometry height="230" width="240" x="441" y="-1035" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-37" parent="sAfq6NbjnnomDAzrktZJ-36" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" value="&lt;b&gt;Streams (Queue)&lt;/b&gt;&lt;br&gt;XADD + MAXLEN&lt;br&gt;Persistence: AOF" vertex="1">
+          <mxGeometry height="60" width="200" x="20" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-38" parent="sAfq6NbjnnomDAzrktZJ-36" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;" value="&lt;b&gt;Cache (Shared)&lt;/b&gt;&lt;br&gt;Agent Sessions&lt;br&gt;Rate Limits (TTL)" vertex="1">
+          <mxGeometry height="60" width="200" x="20" y="130" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-39" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.015;entryY=0.15;entryDx=0;entryDy=0;entryPerimeter=0;" target="sAfq6NbjnnomDAzrktZJ-37">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-40" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-37" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.435;entryY=0.025;entryDx=0;entryDy=0;entryPerimeter=0;" target="sAfq6NbjnnomDAzrktZJ-21">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="500" y="-935" />
+              <mxPoint x="500" y="-790" />
+              <mxPoint x="455" y="-790" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-42" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="400" width="780" x="20" y="-420" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-44" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="&lt;font style=&quot;font-size: 36px;&quot;&gt;Архитектура исходящих сообщений&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="640" x="80" y="-420" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-45" parent="1" style="device;whiteSpace=wrap;html=1;fillColor=#f5f5f5;" value="&lt;b&gt;Agent UI (v0)&lt;/b&gt;&lt;br&gt;Input Field + AI Draft" vertex="1">
+          <mxGeometry height="100" width="140" x="31" y="-330" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-46" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;Go API Handler&lt;/b&gt;&lt;br&gt;POST /messages/send&lt;br&gt;Validation &amp; DB Save" vertex="1">
+          <mxGeometry height="60" width="160" x="231" y="-310" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-47" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="&lt;b&gt;Redis Stream&lt;/b&gt;&lt;br&gt;(Outbound Queue)&lt;br&gt;Retry Policy" vertex="1">
+          <mxGeometry height="80" width="100" x="451" y="-320" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-48" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="&lt;b&gt;Outbound Worker&lt;/b&gt;&lt;br&gt;Rate Limiter&lt;br&gt;Platform Adapter" vertex="1">
+          <mxGeometry height="60" width="150" x="631" y="-310" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-49" parent="1" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#fff2cc;" value="&lt;b&gt;Official APIs&lt;/b&gt;&lt;br&gt;TG Bot API / WA Cloud API&lt;br&gt;FB Graph API" vertex="1">
+          <mxGeometry height="90" width="180" x="616" y="-170" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-50" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;" value="&lt;b&gt;WebSocket Hub&lt;/b&gt;&lt;br&gt;Broadcast to other agents" vertex="1">
+          <mxGeometry height="60" width="140" x="241" y="-155" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-51" parent="1" style="shape=datastore;whiteSpace=wrap;html=1;fillColor=#e1d5e7;" value="&lt;b&gt;PostgreSQL&lt;/b&gt;&lt;br&gt;Update Status: SENT" vertex="1">
+          <mxGeometry height="80" width="100" x="451" y="-170" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-52" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-45" target="sAfq6NbjnnomDAzrktZJ-46">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-53" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-46" target="sAfq6NbjnnomDAzrktZJ-47">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-54" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-47" target="sAfq6NbjnnomDAzrktZJ-48">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-55" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-48" target="sAfq6NbjnnomDAzrktZJ-49">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-56" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-46" target="sAfq6NbjnnomDAzrktZJ-50">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint value="Sync View" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="sAfq6NbjnnomDAzrktZJ-57" edge="1" parent="1" source="sAfq6NbjnnomDAzrktZJ-48" target="sAfq6NbjnnomDAzrktZJ-51">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="530" width="800" x="10" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-3" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;autosize=1;resizable=0;" value="&lt;font style=&quot;font-size: 36px;&quot;&gt;Архитектура таргетированной рекламы&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="700" x="81" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-27" parent="1" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#f5f5f5;" value="EXTERNAL PLATFORMS&lt;br&gt;(Meta Ads, Google Ads,&lt;br&gt;TG, WA, TikTok)" vertex="1">
+          <mxGeometry height="110" width="210" x="31" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-28" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="&lt;b&gt;Go API &amp; Ingress&lt;/b&gt;&lt;br&gt;Webhooks / Ads API&lt;br&gt;Validation &amp; Auth" vertex="1">
+          <mxGeometry height="60" width="160" x="321" y="145" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-29" parent="1" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="REDIS (Memory Engine)" vertex="1">
+          <mxGeometry height="100" width="240" x="551" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-30" parent="zSgenX0yW-P9PG1423lu-29" style="rounded=0;whiteSpace=wrap;html=1;" value="Stream: ADS_TASKS" vertex="1">
+          <mxGeometry height="30" width="200" x="20" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-31" parent="1" style="swimlane;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="GO WORKER POOL" vertex="1">
+          <mxGeometry height="100" width="230" x="551" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-32" parent="zSgenX0yW-P9PG1423lu-31" style="rounded=1;whiteSpace=wrap;html=1;" value="Ads Sync" vertex="1">
+          <mxGeometry height="40" width="200" x="20" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-33" parent="1" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="&lt;b&gt;PostgreSQL (Unified DB)&lt;/b&gt;" vertex="1">
+          <mxGeometry height="90" width="240" x="561" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-34" parent="zSgenX0yW-P9PG1423lu-33" style="text;html=1;" value="Ads Stats &amp; Campaigns" vertex="1">
+          <mxGeometry height="30" width="200" x="20" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-35" parent="zSgenX0yW-P9PG1423lu-33" style="text;html=1;" value="Dynamic Catalog (JSONB)" vertex="1">
+          <mxGeometry height="30" width="200" x="20" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-36" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;" value="WebSocket Hub" vertex="1">
+          <mxGeometry height="60" width="130" x="86" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-37" edge="1" parent="1" source="zSgenX0yW-P9PG1423lu-38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="zSgenX0yW-P9PG1423lu-49">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-38" parent="1" style="device;whiteSpace=wrap;html=1;" value="&lt;b&gt;Agent UI (v0)&lt;/b&gt;&lt;br&gt;Inbox &amp; Ads Dashboard" vertex="1">
+          <mxGeometry height="110" width="140" x="86" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-39" edge="1" parent="1" source="zSgenX0yW-P9PG1423lu-27" target="zSgenX0yW-P9PG1423lu-28">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-40" edge="1" parent="1" source="zSgenX0yW-P9PG1423lu-36" target="zSgenX0yW-P9PG1423lu-38">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-42" edge="1" parent="1" source="zSgenX0yW-P9PG1423lu-28" target="zSgenX0yW-P9PG1423lu-30">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-43" edge="1" parent="1" source="zSgenX0yW-P9PG1423lu-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="zSgenX0yW-P9PG1423lu-32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-44" edge="1" parent="1" source="zSgenX0yW-P9PG1423lu-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="221" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-45" edge="1" parent="1" source="zSgenX0yW-P9PG1423lu-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.458;entryY=-0.044;entryDx=0;entryDy=0;entryPerimeter=0;" target="zSgenX0yW-P9PG1423lu-33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-46" edge="1" parent="1" source="zSgenX0yW-P9PG1423lu-47" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=0;exitDx=0;exitDy=0;" target="zSgenX0yW-P9PG1423lu-27">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="464" y="260" />
+              <mxPoint x="136" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-47" parent="1" style="swimlane;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="GO HANDLER" vertex="1">
+          <mxGeometry height="100" width="230" x="291" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-48" edge="1" parent="zSgenX0yW-P9PG1423lu-47" source="zSgenX0yW-P9PG1423lu-49" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="270" y="70" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="zSgenX0yW-P9PG1423lu-49" parent="zSgenX0yW-P9PG1423lu-47" style="rounded=1;whiteSpace=wrap;html=1;" value="Ads Creation" vertex="1">
+          <mxGeometry height="40" width="200" x="20" y="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
