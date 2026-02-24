@@ -11,6 +11,9 @@ import (
 // ErrNoChannel is returned when no active channel exists for a platform.
 var ErrNoChannel = errors.New("no active channel for platform")
 
+// ErrMessageAlreadyExists is returned when a message with the same external_id already exists.
+var ErrMessageAlreadyExists = errors.New("message with this external_id already exists")
+
 // Channel represents a messaging platform connection
 type Channel struct {
 	ID          uuid.UUID       `json:"id" db:"id"`
@@ -108,14 +111,14 @@ type DialogEvent struct {
 type EventType string
 
 const (
-	EventTypeCreated            EventType = "created"
-	EventTypeMessageReceived    EventType = "message_received"
-	EventTypeAssigned           EventType = "assigned"
-	EventTypeTransferred        EventType = "transferred"
-	EventTypeStatusChanged      EventType = "status_changed"
-	EventTypeAIDraftGenerated   EventType = "ai_draft_generated"
-	EventTypePriorityEscalated  EventType = "priority_escalated"
-	EventTypeClosed             EventType = "closed"
+	EventTypeCreated           EventType = "created"
+	EventTypeMessageReceived   EventType = "message_received"
+	EventTypeAssigned          EventType = "assigned"
+	EventTypeTransferred       EventType = "transferred"
+	EventTypeStatusChanged     EventType = "status_changed"
+	EventTypeAIDraftGenerated  EventType = "ai_draft_generated"
+	EventTypePriorityEscalated EventType = "priority_escalated"
+	EventTypeClosed            EventType = "closed"
 )
 
 // DialogWithDetails represents a dialog with full details
@@ -127,8 +130,8 @@ type DialogWithDetails struct {
 
 // CreateMessageRequest represents the request to send a message
 type CreateMessageRequest struct {
-	Content    string          `json:"content" binding:"required"`
-	Payload    json.RawMessage `json:"payload"`
+	Content string          `json:"content" binding:"required"`
+	Payload json.RawMessage `json:"payload"`
 }
 
 // AssignDialogRequest represents the request to assign a dialog to an agent

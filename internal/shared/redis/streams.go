@@ -16,6 +16,7 @@ const (
 	StreamOutboundMessages = "stream:outbound_messages" // Messages to send (DB → Platform)
 	StreamAdsTasks         = "stream:ads_tasks"         // Ads sync tasks
 	StreamAIJobs           = "stream:ai_jobs"           // AI/MCP processing
+	StreamDeadLetters      = "stream:dead_letters"      // Failed messages after max retries
 )
 
 // StreamManager handles Redis Stream operations with at-least-once delivery guarantees
@@ -194,6 +195,47 @@ func (sm *StreamManager) ClaimMessage(
 	}
 
 	return messages, nil
+}
+
+// AutoClaimMessages uses XAUTOCLAIM (Redis 6.2+) to atomically find and claim
+// pending messages that have been idle for at least minIdleTime.
+// Returns claimed messages, the cursor for next iteration, and any error.
+func (sm *StreamManager) AutoClaimMessages(
+	ctx context.Context,
+	streamName, groupName, consumerName string,
+	minIdleTime time.Duration,
+	start string,
+	count int64,
+) (messages []redis.XMessage, nextStart string, err error) {
+	msgs, newStart, err := sm.client.XAutoClaim(ctx, &redis.XAutoClaimArgs{
+		Stream:   streamName,
+		Group:    groupName,
+		Consumer: consumerName,
+		MinIdle:  minIdleTime,
+		Start:    start,
+		Count:    count,
+	}).Result()
+
+	if err != nil {
+		sm.logger.Error("failed to auto-claim messages",
+			zap.String("stream", streamName),
+			zap.String("group", groupName),
+			zap.String("consumer", consumerName),
+			zap.Duration("min_idle", minIdleTime),
+			zap.Error(err),
+		)
+		return nil, "0-0", fmt.Errorf("failed to auto-claim messages: %w", err)
+	}
+
+	if len(msgs) > 0 {
+		sm.logger.Info("auto-claimed pending messages",
+			zap.String("stream", streamName),
+			zap.Int("count", len(msgs)),
+			zap.String("next_start", newStart),
+		)
+	}
+
+	return msgs, newStart, nil
 }
 
 // TrimStream trims the stream to the specified max length

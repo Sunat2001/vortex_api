@@ -37,11 +37,25 @@ CREATE TABLE role_permissions
 
 CREATE TABLE users
 (
-    id         UUID PRIMARY KEY         DEFAULT gen_random_uuid(),
-    email      VARCHAR(255) UNIQUE NOT NULL,
-    full_name  VARCHAR(255),
-    status     VARCHAR(50)              DEFAULT 'offline', -- 'online', 'offline', 'busy'
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id            UUID PRIMARY KEY         DEFAULT gen_random_uuid(),
+    email         VARCHAR(255) UNIQUE NOT NULL,
+    full_name     VARCHAR(255),
+    password_hash TEXT                     NOT NULL DEFAULT '',
+    status        VARCHAR(50)              DEFAULT 'offline', -- 'online', 'offline', 'busy'
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE refresh_tokens
+(
+    id          UUID PRIMARY KEY         DEFAULT gen_random_uuid(),
+    user_id     UUID                     NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    token_hash  VARCHAR(64)              NOT NULL,
+    device_id   VARCHAR(255)             NOT NULL,
+    device_name VARCHAR(255)             NOT NULL DEFAULT '',
+    ip_address  VARCHAR(45)              NOT NULL DEFAULT '',
+    expires_at  TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    revoked_at  TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE user_roles
@@ -236,3 +250,8 @@ CREATE INDEX idx_lead_events_platform_id ON ad_lead_events (platform_lead_id);
 -- Каталог
 CREATE INDEX idx_catalog_type_category ON catalog_items (entity_type, category);
 CREATE INDEX idx_catalog_attributes ON catalog_items USING GIN (attributes);
+
+-- Аутентификация
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens (user_id);
+CREATE INDEX idx_refresh_tokens_user_device ON refresh_tokens (user_id, device_id) WHERE revoked_at IS NULL;
+CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens (token_hash) WHERE revoked_at IS NULL;

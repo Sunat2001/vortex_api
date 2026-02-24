@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 )
 
 // Usecase defines the business logic interface for the chat domain.
-// TODO: I still don't like this way of use_cases. Remeber me to refactor it throw one useCase package and seapre files
 type Usecase interface {
 	ProcessIncomingWebhook(ctx context.Context, req *ProcessWebhookRequest) (*ProcessWebhookResponse, error)
 }
@@ -33,7 +33,6 @@ func NewUsecase(repo Repository, logger *zap.Logger) Usecase {
 
 // ProcessIncomingWebhook parses the platform-specific webhook and persists
 // contacts, dialogs, messages, and events.
-// TODO: Refactoring for better naming, i don't like this way where is one function for all handling.
 func (u *usecaseImpl) ProcessIncomingWebhook(ctx context.Context, req *ProcessWebhookRequest) (*ProcessWebhookResponse, error) {
 	// 1. Get the appropriate parser for the platform.
 	p, err := parser.New(string(req.Platform))
@@ -112,7 +111,6 @@ func (u *usecaseImpl) processMessage(ctx context.Context, channel *Channel, msg 
 		"media_type": string(msg.MediaType),
 	})
 
-	//TODO: Fix dublicate key entry on external_id
 	message := &Message{
 		ID:         uuid.New(),
 		DialogID:   dialog.ID,
@@ -124,6 +122,13 @@ func (u *usecaseImpl) processMessage(ctx context.Context, channel *Channel, msg 
 		CreatedAt:  time.Now(),
 	}
 	if err := u.repo.CreateMessage(ctx, message); err != nil {
+		if errors.Is(err, ErrMessageAlreadyExists) {
+			u.logger.Info("message already exists, skipping duplicate",
+				zap.String("external_id", message.ExternalID),
+				zap.String("dialog_id", dialog.ID.String()),
+			)
+			return nil
+		}
 		return fmt.Errorf("failed to create message: %w", err)
 	}
 

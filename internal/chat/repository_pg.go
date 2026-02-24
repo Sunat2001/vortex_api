@@ -3,9 +3,11 @@ package chat
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -407,6 +409,10 @@ func (r *PgRepository) CreateMessage(ctx context.Context, message *Message) erro
 	)
 
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return ErrMessageAlreadyExists
+		}
 		return fmt.Errorf("failed to create message: %w", err)
 	}
 

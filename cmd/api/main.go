@@ -15,6 +15,8 @@ import (
 	"github.com/voronka/backend/internal/agent"
 	agentDelivery "github.com/voronka/backend/internal/agent/delivery"
 	"github.com/voronka/backend/internal/app"
+	"github.com/voronka/backend/internal/auth"
+	authDelivery "github.com/voronka/backend/internal/auth/delivery"
 	chatDelivery "github.com/voronka/backend/internal/chat/delivery"
 	"github.com/voronka/backend/internal/shared/middleware"
 )
@@ -44,9 +46,15 @@ func main() {
 
 	// Initialize repositories
 	agentRepo := agent.NewRepository(infra.PgPool)
+	authRepo := auth.NewRepository(infra.PgPool)
 
 	// Initialize use cases
 	agentUsecase := agent.NewUsecase(agentRepo, logger)
+	authUsecase := auth.NewUsecase(authRepo, &cfg.JWT, logger)
+
+	// Initialize token validator for middleware
+	tokenValidator := auth.NewTokenValidator(authUsecase)
+	authMw := middleware.AuthMiddleware(tokenValidator)
 
 	// Set Gin mode
 	if cfg.App.IsProduction() {
@@ -69,8 +77,12 @@ func main() {
 	})
 
 	// API v1 routes
-	v1 := router.Group("api/v1")
+	v1 := router.Group("/api/v1")
 	{
+		// Auth routes
+		authHandler := authDelivery.NewHTTPHandler(authUsecase, logger)
+		authHandler.RegisterRoutes(v1, authMw)
+
 		// Agent routes
 		agentHandler := agentDelivery.NewHTTPHandler(agentUsecase, logger)
 		agentHandler.RegisterRoutes(v1)

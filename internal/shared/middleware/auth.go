@@ -8,15 +8,20 @@ import (
 	"github.com/google/uuid"
 )
 
-// AuthContextKey is the key used to store user info in context
+// Context keys for storing auth info
 const (
-	AuthContextKey = "user_id"
-	RoleContextKey = "user_roles"
+	AuthContextKey   = "user_id"
+	DeviceContextKey = "device_id"
+	RoleContextKey   = "user_roles"
 )
 
+// TokenValidator is an interface for validating JWT access tokens
+type TokenValidator interface {
+	ValidateAccessToken(tokenString string) (userID uuid.UUID, deviceID string, roles []string, err error)
+}
+
 // AuthMiddleware validates JWT tokens and extracts user information
-// TODO: Implement actual JWT validation with a proper library (e.g., golang-jwt/jwt)
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(validator TokenValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -35,24 +40,24 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		token := parts[1]
 
-		// TODO: Validate JWT token and extract claims
-		// For now, this is a placeholder implementation
-		userID, err := validateToken(token)
+		userID, deviceID, roles, err := validator.ValidateAccessToken(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			c.Abort()
 			return
 		}
 
-		// Store user ID in context
+		// Store claims in context
 		c.Set(AuthContextKey, userID)
+		c.Set(DeviceContextKey, deviceID)
+		c.Set(RoleContextKey, roles)
 
 		c.Next()
 	}
 }
 
 // OptionalAuthMiddleware is similar to AuthMiddleware but doesn't abort if token is missing
-func OptionalAuthMiddleware() gin.HandlerFunc {
+func OptionalAuthMiddleware(validator TokenValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -67,27 +72,15 @@ func OptionalAuthMiddleware() gin.HandlerFunc {
 		}
 
 		token := parts[1]
-		userID, err := validateToken(token)
+		userID, deviceID, roles, err := validator.ValidateAccessToken(token)
 		if err == nil {
 			c.Set(AuthContextKey, userID)
+			c.Set(DeviceContextKey, deviceID)
+			c.Set(RoleContextKey, roles)
 		}
 
 		c.Next()
 	}
-}
-
-// validateToken validates the JWT token and returns the user ID
-// TODO: Implement actual JWT validation logic
-func validateToken(token string) (uuid.UUID, error) {
-	// Placeholder implementation
-	// In production, you would:
-	// 1. Parse the JWT token
-	// 2. Verify the signature
-	// 3. Check expiration
-	// 4. Extract claims (user_id, roles, etc.)
-
-	// For now, return a dummy UUID
-	return uuid.Nil, nil
 }
 
 // GetUserID retrieves the user ID from the Gin context
@@ -98,5 +91,16 @@ func GetUserID(c *gin.Context) (uuid.UUID, bool) {
 	}
 
 	id, ok := userID.(uuid.UUID)
+	return id, ok
+}
+
+// GetDeviceID retrieves the device ID from the Gin context
+func GetDeviceID(c *gin.Context) (string, bool) {
+	deviceID, exists := c.Get(DeviceContextKey)
+	if !exists {
+		return "", false
+	}
+
+	id, ok := deviceID.(string)
 	return id, ok
 }

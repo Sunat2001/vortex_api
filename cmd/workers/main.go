@@ -58,7 +58,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		startInboundRawWorker(workerCtx, infra.StreamManager, chatUsecase, cfg.Redis.ConsumerGroup, consumerName, logger)
+		startInboundRawWorker(workerCtx, infra.StreamManager, chatUsecase, &cfg.Redis, cfg.Redis.ConsumerGroup, consumerName, logger)
 	}()
 
 	// Inbound Messages Worker (processes parsed messages)

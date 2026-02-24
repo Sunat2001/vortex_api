@@ -16,6 +16,15 @@ type Config struct {
 	Redis    RedisConfig
 	Logger   LoggerConfig
 	Webhooks WebhooksConfig
+	JWT      JWTConfig
+}
+
+type JWTConfig struct {
+	AccessSecret  string
+	RefreshSecret string
+	AccessTTL     time.Duration
+	RefreshTTL    time.Duration
+	Issuer        string
 }
 
 type AppConfig struct {
@@ -67,6 +76,15 @@ type RedisConfig struct {
 	StreamMaxLen      int64
 	ConsumerGroup     string
 	ConsumerBlockTime time.Duration
+
+	// Worker pool
+	WorkerPoolSize int
+
+	// XCLAIM recovery
+	ClaimMinIdleTime time.Duration
+	ClaimInterval    time.Duration
+	ClaimBatchSize   int64
+	MaxRetryCount    int64
 }
 
 type LoggerConfig struct {
@@ -146,6 +164,11 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("redis.streammaxlen", "REDIS_STREAMMAXLEN")
 	_ = viper.BindEnv("redis.consumergroup", "REDIS_CONSUMERGROUP")
 	_ = viper.BindEnv("redis.consumerblocktime", "REDIS_CONSUMERBLOCKTIME")
+	_ = viper.BindEnv("redis.workerpoolsize", "REDIS_WORKERPOOLSIZE")
+	_ = viper.BindEnv("redis.claimminidletime", "REDIS_CLAIMMINIDLETIME")
+	_ = viper.BindEnv("redis.claiminterval", "REDIS_CLAIMINTERVAL")
+	_ = viper.BindEnv("redis.claimbatchsize", "REDIS_CLAIMBATCHSIZE")
+	_ = viper.BindEnv("redis.maxretrycount", "REDIS_MAXRETRYCOUNT")
 
 	// Logger
 	_ = viper.BindEnv("logger.level", "LOGGER_LEVEL")
@@ -159,6 +182,13 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("webhooks.instagram.appsecret", "WEBHOOKS_INSTAGRAM_APPSECRET")
 	_ = viper.BindEnv("webhooks.whatsapp.verifytoken", "WEBHOOKS_WHATSAPP_VERIFYTOKEN")
 	_ = viper.BindEnv("webhooks.whatsapp.appsecret", "WEBHOOKS_WHATSAPP_APPSECRET")
+
+	// JWT
+	_ = viper.BindEnv("jwt.accesssecret", "JWT_ACCESS_SECRET")
+	_ = viper.BindEnv("jwt.refreshsecret", "JWT_REFRESH_SECRET")
+	_ = viper.BindEnv("jwt.accessttl", "JWT_ACCESS_TTL")
+	_ = viper.BindEnv("jwt.refreshttl", "JWT_REFRESH_TTL")
+	_ = viper.BindEnv("jwt.issuer", "JWT_ISSUER")
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
@@ -206,6 +236,11 @@ func setDefaults() {
 	viper.SetDefault("redis.streammaxlen", 10000)
 	viper.SetDefault("redis.consumergroup", "voronka-workers")
 	viper.SetDefault("redis.consumerblocktime", 2*time.Second)
+	viper.SetDefault("redis.workerpoolsize", 10)
+	viper.SetDefault("redis.claimminidletime", 60*time.Second)
+	viper.SetDefault("redis.claiminterval", 30*time.Second)
+	viper.SetDefault("redis.claimbatchsize", 50)
+	viper.SetDefault("redis.maxretrycount", 3)
 
 	// Logger
 	viper.SetDefault("logger.level", "info")
@@ -219,6 +254,13 @@ func setDefaults() {
 	viper.SetDefault("webhooks.instagram.appsecret", "")
 	viper.SetDefault("webhooks.whatsapp.verifytoken", "")
 	viper.SetDefault("webhooks.whatsapp.appsecret", "")
+
+	// JWT
+	viper.SetDefault("jwt.accesssecret", "change-me-access-secret")
+	viper.SetDefault("jwt.refreshsecret", "change-me-refresh-secret")
+	viper.SetDefault("jwt.accessttl", 15*time.Minute)
+	viper.SetDefault("jwt.refreshttl", 7*24*time.Hour)
+	viper.SetDefault("jwt.issuer", "vortex")
 }
 
 // GetDSN returns PostgreSQL connection string
