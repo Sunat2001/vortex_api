@@ -40,20 +40,20 @@ func (u *usecaseImpl) ProcessIncomingWebhook(ctx context.Context, req *ProcessWe
 		return nil, fmt.Errorf("unsupported platform %s: %w", req.Platform, err)
 	}
 
-	// 2. Parse webhook into a list of incoming messages.
+	// 2. Parse webhook into a list of events.
 	u.logger.Debug("raw webhook payload",
 		zap.String("platform", string(req.Platform)),
 		zap.String("payload", string(req.RawPayload)),
 	)
 
-	incoming, err := p.Parse(req.RawPayload)
+	events, err := p.Parse(req.RawPayload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse webhook: %w", err)
 	}
 
-	u.logger.Debug("parsed webhook messages",
+	u.logger.Debug("parsed webhook events",
 		zap.String("platform", string(req.Platform)),
-		zap.Int("count", len(incoming)),
+		zap.Int("count", len(events)),
 	)
 
 	// 3. Resolve channel for this platform (must be pre-configured).
@@ -62,18 +62,32 @@ func (u *usecaseImpl) ProcessIncomingWebhook(ctx context.Context, req *ProcessWe
 		return nil, fmt.Errorf("%w %s: %w", ErrNoChannel, req.Platform, err)
 	}
 
-	// 4. Process each message.
+	// 4. Process each event.
 	resp := &ProcessWebhookResponse{}
-	for _, msg := range incoming {
-		if err := u.processMessage(ctx, channel, msg); err != nil {
-			u.logger.Error("failed to process incoming message",
-				zap.String("platform", string(req.Platform)),
-				zap.String("sender", msg.ExternalSenderID),
-				zap.Error(err),
-			)
-			continue
+	for _, event := range events {
+		switch event.Kind {
+		case parser.EventKindMessage:
+			if err := u.processMessage(ctx, channel, event.Message); err != nil {
+				u.logger.Error("failed to process incoming message",
+					zap.String("platform", string(req.Platform)),
+					zap.String("sender", event.Message.ExternalSenderID),
+					zap.Error(err),
+				)
+				continue
+			}
+			resp.MessagesCreated++
+
+		case parser.EventKindStatus:
+			if err := u.processStatusUpdate(ctx, channel, event.Status); err != nil {
+				u.logger.Error("failed to process status update",
+					zap.String("platform", string(req.Platform)),
+					zap.String("external_message_id", event.Status.ExternalMessageID),
+					zap.Error(err),
+				)
+				continue
+			}
+			resp.StatusesProcessed++
 		}
-		resp.MessagesCreated++
 	}
 
 	return resp, nil
@@ -106,10 +120,26 @@ func (u *usecaseImpl) processMessage(ctx context.Context, channel *Channel, msg 
 		payload = json.RawMessage(`{}`)
 	}
 
-	metadataJSON, _ := json.Marshal(map[string]interface{}{
-		"platform":   channel.Platform,
+	metadataMap := map[string]interface{}{
 		"media_type": string(msg.MediaType),
-	})
+	}
+
+	// Merge parser-level metadata (errors, from_logical_id, country_code, etc.).
+	if msg.Metadata != nil {
+		var parserMeta map[string]interface{}
+		if err := json.Unmarshal(msg.Metadata, &parserMeta); err == nil {
+			for k, v := range parserMeta {
+				metadataMap[k] = v
+			}
+		}
+	}
+
+	metadataJSON, _ := json.Marshal(metadataMap)
+
+	createdAt := msg.Timestamp
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
 
 	message := &Message{
 		ID:         uuid.New(),
@@ -119,7 +149,7 @@ func (u *usecaseImpl) processMessage(ctx context.Context, channel *Channel, msg 
 		Content:    msg.Content,
 		Payload:    payload,
 		Metadata:   json.RawMessage(metadataJSON),
-		CreatedAt:  time.Now(),
+		CreatedAt:  createdAt,
 	}
 	if err := u.repo.CreateMessage(ctx, message); err != nil {
 		if errors.Is(err, ErrMessageAlreadyExists) {
@@ -153,6 +183,43 @@ func (u *usecaseImpl) processMessage(ctx context.Context, channel *Channel, msg 
 	if err := u.repo.CreateDialogEvent(ctx, event); err != nil {
 		u.logger.Warn("failed to create dialog event", zap.Error(err))
 	}
+
+	return nil
+}
+
+// processStatusUpdate handles a delivery/read receipt: looks up the original
+// message by external_id and creates a dialog_event with type "status_updated".
+func (u *usecaseImpl) processStatusUpdate(ctx context.Context, channel *Channel, status *parser.StatusUpdate) error {
+	// 1. Find the original message.
+	message, err := u.repo.GetMessageByExternalID(ctx, status.ExternalMessageID)
+	if err != nil {
+		return fmt.Errorf("failed to find message for status update (external_id=%s): %w", status.ExternalMessageID, err)
+	}
+
+	// 2. Create a dialog event.
+	eventPayload, _ := json.Marshal(map[string]interface{}{
+		"message_id":          message.ID.String(),
+		"external_message_id": status.ExternalMessageID,
+		"status":              status.Status,
+		"timestamp":           status.Timestamp.Format(time.RFC3339),
+	})
+
+	event := &DialogEvent{
+		ID:        uuid.New(),
+		DialogID:  message.DialogID,
+		EventType: EventTypeStatusUpdated,
+		Payload:   json.RawMessage(eventPayload),
+		CreatedAt: time.Now(),
+	}
+
+	if err := u.repo.CreateDialogEvent(ctx, event); err != nil {
+		return fmt.Errorf("failed to create status update event: %w", err)
+	}
+
+	u.logger.Info("status update processed",
+		zap.String("message_id", message.ID.String()),
+		zap.String("status", status.Status),
+	)
 
 	return nil
 }

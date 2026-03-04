@@ -239,6 +239,9 @@ CREATE TABLE messages
 CREATE INDEX idx_messages_dialog_at ON messages (dialog_id, created_at DESC);
 CREATE UNIQUE INDEX idx_messages_external_id ON messages (external_id) WHERE external_id IS NOT NULL;
 CREATE INDEX idx_dialogs_status ON dialogs (status);
+-- Only one open/pending dialog per contact per channel (prevents race condition duplicates)
+CREATE UNIQUE INDEX idx_dialogs_channel_contact_active ON dialogs (channel_id, contact_id)
+    WHERE status IN ('open', 'pending');
 CREATE INDEX idx_contacts_external_id ON contacts (external_id);
 CREATE INDEX idx_contacts_email ON contacts (email) WHERE email IS NOT NULL;
 

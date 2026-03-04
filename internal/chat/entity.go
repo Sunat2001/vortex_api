@@ -3,6 +3,7 @@ package chat
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -119,6 +120,7 @@ const (
 	EventTypeAIDraftGenerated  EventType = "ai_draft_generated"
 	EventTypePriorityEscalated EventType = "priority_escalated"
 	EventTypeClosed            EventType = "closed"
+	EventTypeStatusUpdated     EventType = "status_updated"
 )
 
 // DialogWithDetails represents a dialog with full details
@@ -154,5 +156,22 @@ type ProcessWebhookRequest struct {
 
 // ProcessWebhookResponse contains stats about processed webhook.
 type ProcessWebhookResponse struct {
-	MessagesCreated int
+	MessagesCreated   int
+	StatusesProcessed int
+}
+
+// ParsePlatform maps a source string to a Platform constant.
+func ParsePlatform(source string) Platform {
+	switch strings.ToLower(source) {
+	case "facebook":
+		return PlatformFacebook
+	case "instagram":
+		return PlatformInstagram
+	case "whatsapp":
+		return PlatformWhatsApp
+	case "telegram":
+		return PlatformTelegram
+	default:
+		return Platform(source)
+	}
 }
