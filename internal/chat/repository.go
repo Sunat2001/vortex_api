@@ -20,6 +20,7 @@ type Repository interface {
 
 	// Message operations
 	CreateMessage(ctx context.Context, message *Message) error
+	GetMessageByExternalID(ctx context.Context, externalID string) (*Message, error)
 	GetMessagesByDialogID(ctx context.Context, dialogID uuid.UUID, limit, offset int) ([]Message, error)
 	GetLastMessage(ctx context.Context, dialogID uuid.UUID) (*Message, error)
 

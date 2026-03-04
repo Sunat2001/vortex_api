@@ -37,6 +37,7 @@
 - Single goroutine per stream = no horizontal scaling within a single process -> DESIGN COMPLETE
 - inbound workers do processRawWebhook -> chat.Usecase.ProcessIncomingWebhook (DB-heavy)
 - No backpressure mechanism on webhook ingestion side -> SOLVED via semaphore backpressure
+- GetOrCreateDialog race condition -> FIXED (Mar 2026): CTE upsert + partial unique index on (channel_id, contact_id) WHERE status IN ('open','pending')
 
 ## XCLAIM Recovery + Worker Pool Design (Feb 2026)
 - Design: `inboundRawWorkerPool` struct with semaphore (buffered chan), XCLAIM recovery goroutine

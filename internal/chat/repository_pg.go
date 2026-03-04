@@ -237,19 +237,37 @@ func (r *PgRepository) GetDialogByID(ctx context.Context, id uuid.UUID) (*Dialog
 }
 
 func (r *PgRepository) GetOrCreateDialog(ctx context.Context, channelID, contactID uuid.UUID) (*Dialog, error) {
-	// First try to find existing open dialog
+	// Atomic upsert using CTE to avoid race condition when concurrent workers
+	// process messages from the same contact on the same channel simultaneously.
+	//
+	// The INSERT uses ON CONFLICT with the partial unique index
+	// idx_dialogs_channel_contact_active (channel_id, contact_id) WHERE status IN ('open','pending').
+	// If an active dialog already exists, DO NOTHING; the subsequent SELECT picks it up.
 	query := `
+		WITH new_dialog AS (
+			INSERT INTO dialogs (id, channel_id, contact_id, status, tags, last_message_at)
+			VALUES ($1, $2, $3, 'open', '[]', NOW())
+			ON CONFLICT (channel_id, contact_id) WHERE status IN ('open', 'pending')
+			DO NOTHING
+			RETURNING id, channel_id, contact_id, current_agent_id, source_ad_id, status, tags, last_message_at
+		)
+		SELECT id, channel_id, contact_id, current_agent_id, source_ad_id, status, tags, last_message_at
+		FROM new_dialog
+		UNION ALL
 		SELECT id, channel_id, contact_id, current_agent_id, source_ad_id, status, tags, last_message_at
 		FROM dialogs
-		WHERE channel_id = $1 AND contact_id = $2 AND status IN ('open', 'pending')
+		WHERE channel_id = $2 AND contact_id = $3 AND status IN ('open', 'pending')
+		  AND NOT EXISTS (SELECT 1 FROM new_dialog)
 		ORDER BY last_message_at DESC
 		LIMIT 1
 	`
 
+	newID := uuid.New()
+
 	var dialog Dialog
 	var tagsJSON []byte
 
-	err := r.pool.QueryRow(ctx, query, channelID, contactID).Scan(
+	err := r.pool.QueryRow(ctx, query, newID, channelID, contactID).Scan(
 		&dialog.ID,
 		&dialog.ChannelID,
 		&dialog.ContactID,
@@ -259,27 +277,12 @@ func (r *PgRepository) GetOrCreateDialog(ctx context.Context, channelID, contact
 		&tagsJSON,
 		&dialog.LastMessageAt,
 	)
-
-	if err == nil {
-		dialog.Tags = json.RawMessage(tagsJSON)
-		return &dialog, nil
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create dialog: %w", err)
 	}
 
-	// If not found, create a new dialog
-	newDialog := &Dialog{
-		ID:            uuid.New(),
-		ChannelID:     channelID,
-		ContactID:     contactID,
-		Status:        DialogStatusOpen,
-		Tags:          json.RawMessage("[]"),
-		LastMessageAt: dialog.LastMessageAt,
-	}
-
-	if err := r.CreateDialog(ctx, newDialog); err != nil {
-		return nil, fmt.Errorf("failed to create new dialog: %w", err)
-	}
-
-	return newDialog, nil
+	dialog.Tags = json.RawMessage(tagsJSON)
+	return &dialog, nil
 }
 
 func (r *PgRepository) ListDialogs(ctx context.Context, filters DialogFilters) ([]Dialog, error) {
@@ -417,6 +420,40 @@ func (r *PgRepository) CreateMessage(ctx context.Context, message *Message) erro
 	}
 
 	return nil
+}
+
+func (r *PgRepository) GetMessageByExternalID(ctx context.Context, externalID string) (*Message, error) {
+	query := `
+		SELECT id, dialog_id, sender_type, external_id, content, payload, metadata, created_at
+		FROM messages
+		WHERE external_id = $1
+		LIMIT 1
+	`
+
+	var message Message
+	var extID *string
+	var payloadJSON, metadataJSON []byte
+
+	err := r.pool.QueryRow(ctx, query, externalID).Scan(
+		&message.ID,
+		&message.DialogID,
+		&message.SenderType,
+		&extID,
+		&message.Content,
+		&payloadJSON,
+		&metadataJSON,
+		&message.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message by external_id: %w", err)
+	}
+
+	if extID != nil {
+		message.ExternalID = *extID
+	}
+	message.Payload = json.RawMessage(payloadJSON)
+	message.Metadata = json.RawMessage(metadataJSON)
+	return &message, nil
 }
 
 func (r *PgRepository) GetMessagesByDialogID(ctx context.Context, dialogID uuid.UUID, limit, offset int) ([]Message, error) {

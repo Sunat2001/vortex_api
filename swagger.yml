@@ -114,33 +114,6 @@ paths:
                   $ref: '#/components/schemas/DialogEvent'
         404:
           description: Диалог не найден
-  components:
-    schemas:
-      DialogEvent:
-        type: object
-        properties:
-          id:
-            type: string
-            format: uuid
-          event_type:
-            type: string
-            enum: [ created, assigned, transferred, status_changed, ai_draft_generated, priority_escalated, closed ]
-            example: transferred
-          actor_id:
-            type: string
-            format: uuid
-            nullable: true
-            description: ID агента, совершившего действие. NULL если действие совершено системой или AI.
-          payload:
-            type: object
-            description: Дополнительные данные события (например, старый и новый статус)
-            example:
-              from_agent: "UUID-1"
-              to_agent: "UUID-2"
-              reason: "shift_end"
-          created_at:
-            type: string
-            format: date-time
   /chats/{id}/messages:
     get:
       tags: [Chats]
@@ -440,6 +413,143 @@ paths:
       summary: Добавить новую позицию в каталог (с attributes JSONB)
 
 components:
+  schemas:
+    DialogEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum:
+            - created
+            - message_received
+            - assigned
+            - transferred
+            - status_changed
+            - status_updated
+            - ai_draft_generated
+            - priority_escalated
+            - closed
+          description: >
+            Type of dialog lifecycle event.
+            `message_received` is written by the webhook processor each time an inbound message is persisted.
+            `status_updated` is written when a delivery/read receipt arrives from the platform (e.g. WhatsApp "sent", "delivered", "read", "failed").
+          example: message_received
+        actor_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID агента, совершившего действие. NULL если действие совершено системой или AI.
+        payload:
+          type: object
+          description: Дополнительные данные события (например, старый и новый статус)
+          example:
+            from_agent: "UUID-1"
+            to_agent: "UUID-2"
+            reason: "shift_end"
+        created_at:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        dialog_id:
+          type: string
+          format: uuid
+        sender_type:
+          type: string
+          enum: [customer, agent, ai, system]
+        external_id:
+          type: string
+          description: Platform-assigned message ID (used for deduplication and status receipt matching).
+        content:
+          type: string
+          description: >
+            Human-readable summary of the message body. For inbound messages this field stores a
+            short placeholder string that indicates the media type rather than the raw text:
+
+            - Text messages: `"[Text]"` — the actual body is in `payload.body`.
+            - Image messages: `"[Image]"` (or the caption if one is present).
+            - Video messages: `"[Video]"` (or the caption if one is present).
+            - Audio messages: `"[Audio]"`.
+            - Document messages: `"[Document]"` (or the caption if one is present).
+            - Location messages: `"[Location]"`.
+            - Unsupported message types: `"[Unsupported: <type>]"` where `<type>` is the
+              raw type string returned by the platform.
+
+            Always inspect `payload` for the full, structured message data.
+          example: "[Text]"
+        payload:
+          type: object
+          description: >
+            Full platform-specific message data. Structure varies by media type:
+
+            - **text**: `{ "body": "Hello, world!" }`
+            - **image / video / document**: `{ "id": "<media_id>", "mime_type": "...", "sha256": "...", "caption": "...", "url": "...", "filename": "..." }`
+            - **audio**: `{ "id": "<media_id>", "mime_type": "...", "voice": true }`
+            - **location**: `{ "latitude": 0.0, "longitude": 0.0, "name": "...", "address": "..." }`
+            - **unsupported**: `{ "type": "<raw_type>" }`
+        metadata:
+          type: object
+          description: >
+            Platform-specific diagnostic and routing metadata attached to the message.
+            May contain any combination of the following fields:
+          properties:
+            media_type:
+              type: string
+              description: >
+                Normalised media type of the message as classified by the parser.
+                Possible values: `text`, `image`, `video`, `audio`, `document`, `location`, `unsupported`.
+              example: "text"
+            from_logical_id:
+              type: string
+              description: >
+                WhatsApp-specific logical sender identifier (`from_logical_id` field from the
+                WhatsApp Cloud API webhook). Present only when the platform supplies it.
+              example: "16505551234"
+            country_code:
+              type: string
+              description: >
+                ISO country code of the sender, derived from the WhatsApp contact profile
+                (`country_code` field). Present only when the platform supplies it.
+              example: "US"
+            errors:
+              type: array
+              description: >
+                Platform-reported errors associated with the message (e.g. WhatsApp delivery
+                failures). Each element mirrors the error object returned by the platform API.
+              items:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    description: Platform error code.
+                    example: 131051
+                  title:
+                    type: string
+                    description: Short human-readable error title.
+                    example: "Message type unknown"
+                  message:
+                    type: string
+                    description: Detailed error description.
+                    example: "Message type is not currently supported."
+                  error_data:
+                    type: object
+                    nullable: true
+                    properties:
+                      details:
+                        type: string
+                        description: Additional context provided by the platform.
+        created_at:
+          type: string
+          format: date-time
+
   securitySchemes:
     bearerAuth:
       type: http

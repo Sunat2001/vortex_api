@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -314,7 +313,7 @@ func processRawWebhook(
 		receivedAt = time.Now()
 	}
 
-	platform := mapSourceToPlatform(source)
+	platform := chat.ParsePlatform(source)
 
 	logger.Info("processing webhook",
 		zap.String("platform", string(platform)),
@@ -337,20 +336,9 @@ func processRawWebhook(
 	logger.Info("webhook processed",
 		zap.String("platform", string(platform)),
 		zap.Int("messages_created", resp.MessagesCreated),
+		zap.Int("statuses_processed", resp.StatusesProcessed),
 	)
 
 	return nil
 }
 
-func mapSourceToPlatform(source string) chat.Platform {
-	switch strings.ToLower(source) {
-	case "facebook":
-		return chat.PlatformFacebook
-	case "instagram":
-		return chat.PlatformInstagram
-	case "whatsapp":
-		return chat.PlatformWhatsApp
-	default:
-		return chat.Platform(source)
-	}
-}
