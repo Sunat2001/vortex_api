@@ -56,19 +56,19 @@ type metaAttachmentMedia struct {
 // MetaParser parses Facebook and Instagram webhook payloads.
 type MetaParser struct{}
 
-func (p *MetaParser) Parse(raw json.RawMessage) ([]*IncomingMessage, error) {
+func (p *MetaParser) Parse(raw json.RawMessage) ([]WebhookEvent, error) {
 	var payload metaWebhookPayload
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil, fmt.Errorf("invalid Meta webhook payload: %w", err)
 	}
 
-	var messages []*IncomingMessage
+	var events []WebhookEvent
 
 	for _, entry := range payload.Entry {
 		// Facebook format: entry[].messaging[]
 		for _, event := range entry.Messaging {
 			if msg := p.parseEvent(event); msg != nil {
-				messages = append(messages, msg)
+				events = append(events, WebhookEvent{Kind: EventKindMessage, Message: msg})
 			}
 		}
 
@@ -78,12 +78,12 @@ func (p *MetaParser) Parse(raw json.RawMessage) ([]*IncomingMessage, error) {
 				continue
 			}
 			if msg := p.parseEvent(change.Value); msg != nil {
-				messages = append(messages, msg)
+				events = append(events, WebhookEvent{Kind: EventKindMessage, Message: msg})
 			}
 		}
 	}
 
-	return messages, nil
+	return events, nil
 }
 
 func (p *MetaParser) parseEvent(event metaMessagingEvent) *IncomingMessage {
