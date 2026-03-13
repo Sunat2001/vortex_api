@@ -161,27 +161,24 @@ func (p *WhatsAppParser) parseMessages(value waValue) []WebhookEvent {
 		switch m.Type {
 		case "text":
 			msg.MediaType = MediaTypeText
-			msg.Content = "[Text]"
-			msg.Payload = mustMarshal(m.Text)
+			if m.Text != nil && m.Text.Body != "" {
+				msg.Content = m.Text.Body
+			}
+			msg.Payload = json.RawMessage(`{}`)
 		case "image":
 			msg.MediaType = MediaTypeImage
-			msg.Content = captionOrPlaceholder(m.Image, "[Image]")
 			msg.Payload = mustMarshal(m.Image)
 		case "video":
 			msg.MediaType = MediaTypeVideo
-			msg.Content = captionOrPlaceholder(m.Video, "[Video]")
 			msg.Payload = mustMarshal(m.Video)
 		case "audio":
 			msg.MediaType = MediaTypeAudio
-			msg.Content = "[Audio]"
 			msg.Payload = mustMarshal(m.Audio)
 		case "document":
 			msg.MediaType = MediaTypeDocument
-			msg.Content = captionOrPlaceholder(m.Document, "[Document]")
 			msg.Payload = mustMarshal(m.Document)
 		case "location":
 			msg.MediaType = MediaTypeLocation
-			msg.Content = "[Location]"
 			msg.Payload = mustMarshal(m.Location)
 		case "unsupported":
 			msg.MediaType = MediaTypeUnsupported
@@ -239,13 +236,6 @@ func (p *WhatsAppParser) parseStatuses(statuses []waStatus) []WebhookEvent {
 		})
 	}
 	return events
-}
-
-func captionOrPlaceholder(media *waMedia, placeholder string) string {
-	if media != nil && media.Caption != "" {
-		return media.Caption
-	}
-	return placeholder
 }
 
 func parseUnixString(s string) time.Time {

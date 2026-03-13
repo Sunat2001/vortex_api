@@ -23,6 +23,7 @@ type Repository interface {
 	GetMessageByExternalID(ctx context.Context, externalID string) (*Message, error)
 	GetMessagesByDialogID(ctx context.Context, dialogID uuid.UUID, limit, offset int) ([]Message, error)
 	GetLastMessage(ctx context.Context, dialogID uuid.UUID) (*Message, error)
+	UpdateMessageStatus(ctx context.Context, externalID string, status MessageStatus) error
 
 	// Dialog Event operations (Audit Log)
 	CreateDialogEvent(ctx context.Context, event *DialogEvent) error
@@ -38,6 +39,12 @@ type Repository interface {
 	GetChannelByID(ctx context.Context, id uuid.UUID) (*Channel, error)
 	GetChannelByPlatform(ctx context.Context, platform Platform) (*Channel, error) // For webhook processing
 	ListChannels(ctx context.Context, platform *Platform) ([]Channel, error)
+
+	// Agent-facing operations
+	ListDialogsWithDetails(ctx context.Context, filters DialogFilters) ([]DialogListItem, error)
+	GetDialogWithContact(ctx context.Context, id uuid.UUID) (*DialogWithDetails, error)
+	ListMessagesCursor(ctx context.Context, cursor MessageCursor) ([]MessageWithSender, error)
+	CreateAgentMessage(ctx context.Context, message *Message) error
 }
 
 // DialogFilters represents filters for listing dialogs
@@ -45,4 +52,13 @@ type DialogFilters struct {
 	AgentID  *uuid.UUID
 	Status   *DialogStatus
 	Platform *Platform
+	Limit    int
+	Cursor   string // last_message_at cursor for pagination
+}
+
+// MessageCursor represents cursor-based pagination params for messages
+type MessageCursor struct {
+	DialogID uuid.UUID
+	Limit    int
+	Cursor   string // created_at,id cursor
 }

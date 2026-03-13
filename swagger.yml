@@ -73,28 +73,169 @@ paths:
       summary: Список всех доступных прав системы
 
   # --- CHATS ---
-  /chats:
+  /dialogs:
     get:
       tags: [Chats]
-      summary: Список активных диалогов
+      summary: Список диалогов с пагинацией
+      security:
+        - bearerAuth: []
       parameters:
         - name: agent_id
           in: query
           schema:
             type: string
+            format: uuid
         - name: status
           in: query
           schema:
             type: string
             enum: [open, pending, closed]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+        - name: cursor
+          in: query
+          description: Cursor for pagination (last_message_at of last item)
+          schema:
+            type: string
       responses:
         200:
-          description: Список диалогов
-  /chats/{id}/events:
+          description: Paginated list of dialogs with contact and last message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DialogListResponse'
+  /dialogs/{id}:
     get:
-      tags: [ Chats ]
+      tags: [Chats]
+      summary: Получить детали диалога с контактом
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Dialog with contact and channel details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DialogWithDetails'
+        404:
+          description: Диалог не найден
+    patch:
+      tags: [Chats]
+      summary: Обновить диалог (назначить агента, сменить статус)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDialogRequest'
+      responses:
+        200:
+          description: Returns the updated dialog object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DialogWithDetails'
+        400:
+          description: Invalid request
+  /dialogs/{id}/messages:
+    get:
+      tags: [Chats]
+      summary: История сообщений (cursor-based pagination, newest first)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+            maximum: 100
+        - name: cursor
+          in: query
+          description: Cursor for pagination (created_at,id of last item)
+          schema:
+            type: string
+      responses:
+        200:
+          description: Paginated list of messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageListResponse'
+    post:
+      tags: [Chats]
+      summary: Отправить сообщение от агента
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        202:
+          description: Сообщение создано и принято в обработку
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageDTO'
+  /dialogs/{id}/read:
+    post:
+      tags: [Chats]
+      summary: Отметить сообщения как прочитанные
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Messages marked as read
+  /dialogs/{id}/events:
+    get:
+      tags: [Chats]
       summary: Получить историю событий диалога (Audit Log)
-      description: Возвращает хронологическую последовательность всех изменений диалога (назначения, смены статусов, передачи между агентами).
+      description: Возвращает хронологическую последовательность всех изменений диалога.
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -114,30 +255,25 @@ paths:
                   $ref: '#/components/schemas/DialogEvent'
         404:
           description: Диалог не найден
-  /chats/{id}/messages:
+  /ws:
     get:
       tags: [Chats]
-      summary: История сообщений в диалоге
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-    post:
-      tags: [Chats]
-      summary: Отправить сообщение (в очередь Redis Outbound)
+      summary: WebSocket подключение для real-time событий
+      description: |
+        Upgrade to WebSocket. Requires Bearer token in Authorization header.
+
+        **Events pushed to client:**
+        - `new_message` — new message in agent's dialog
+        - `dialog_updated` — dialog status/assignment changed
+        - `typing` — typing indicator from another user
+
+        **Events client can send:**
+        - `typing` — typing indicator with dialog_id in payload
+      security:
+        - bearerAuth: []
       responses:
-        202:
-          description: Сообщение принято в обработку
-  /chats/{id}/assign:
-    patch:
-      tags: [Chats]
-      summary: Назначить агента на диалог
-  /chats/{id}/transfer:
-    post:
-      tags: [Chats]
-      summary: Передать диалог другому агенту
+        101:
+          description: WebSocket upgrade successful
 
   # --- WEBHOOKS ---
   /webhooks/facebook:
@@ -549,6 +685,215 @@ components:
         created_at:
           type: string
           format: date-time
+
+    DialogListResponse:
+      type: object
+      properties:
+        dialogs:
+          type: array
+          items:
+            $ref: '#/components/schemas/DialogListItem'
+        next_cursor:
+          type: string
+          description: Cursor for next page (empty if no more pages)
+        has_more:
+          type: boolean
+
+    DialogListItem:
+      type: object
+      description: Flattened dialog item for mobile list view
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, archived, closed]
+          description: "Mapped from internal: open→active, pending→archived, closed→closed"
+        client_name:
+          type: string
+          description: Contact name (from contacts table)
+        client_avatar:
+          type: string
+          nullable: true
+        channel:
+          type: string
+          enum: [telegram, whatsapp, instagram, facebook]
+          description: Platform name as string (not nested object)
+        last_message:
+          type: string
+          description: Last message content text (not nested object)
+        last_message_at:
+          type: string
+          format: date-time
+        unread_count:
+          type: integer
+          description: Number of unread messages in this dialog
+        is_online:
+          type: boolean
+          description: Whether the contact is currently online (defaults to false)
+        assigned_agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        assigned_agent_name:
+          type: string
+          description: Full name of the assigned agent
+        tags:
+          type: array
+          items:
+            type: string
+        contact_id:
+          type: string
+          format: uuid
+        channel_id:
+          type: string
+          format: uuid
+
+    DialogWithDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        channel_id:
+          type: string
+          format: uuid
+        contact_id:
+          type: string
+          format: uuid
+        current_agent_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [open, pending, closed]
+        tags:
+          type: array
+          items:
+            type: string
+        last_message_at:
+          type: string
+          format: date-time
+        contact:
+          $ref: '#/components/schemas/Contact'
+        channel:
+          $ref: '#/components/schemas/Channel'
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        external_id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    Channel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        platform:
+          type: string
+          enum: [telegram, whatsapp, instagram, facebook]
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    MessageDTO:
+      type: object
+      description: Message response with sender_name and status for mobile
+      properties:
+        id:
+          type: string
+          format: uuid
+        dialog_id:
+          type: string
+          format: uuid
+        sender_type:
+          type: string
+          enum: [client, agent, ai, system]
+          description: "Note: 'customer' is mapped to 'client' for mobile"
+        sender_name:
+          type: string
+          description: Resolved sender name (contact name for client, agent name for agent)
+        external_id:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [sent, delivered, read]
+          description: Message delivery status
+        payload:
+          type: object
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    MessageListResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageDTO'
+        next_cursor:
+          type: string
+          description: Cursor for next page (created_at,id format)
+        has_more:
+          type: boolean
+
+    SendMessageRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          description: Message text content
+        payload:
+          type: object
+          description: Optional structured payload (media, buttons, etc.)
+
+    UpdateDialogRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [open, pending, closed]
+          description: New dialog status
+        agent_id:
+          type: string
+          format: uuid
+          description: Agent to assign the dialog to
+
+    WSEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [new_message, dialog_updated, typing, message_read]
+        data:
+          type: object
+          description: "Event payload (key is 'data', not 'payload')"
 
   securitySchemes:
     bearerAuth:

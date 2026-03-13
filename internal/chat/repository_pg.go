@@ -396,9 +396,13 @@ func (r *PgRepository) TransferDialog(ctx context.Context, dialogID, fromAgentID
 // Message operations
 
 func (r *PgRepository) CreateMessage(ctx context.Context, message *Message) error {
+	status := message.Status
+	if status == "" {
+		status = MessageStatusSent
+	}
 	query := `
-		INSERT INTO messages (id, dialog_id, sender_type, external_id, content, payload, metadata, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO messages (id, dialog_id, sender_type, external_id, content, status, payload, metadata, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 	_, err := r.pool.Exec(ctx, query,
 		message.ID,
@@ -406,6 +410,7 @@ func (r *PgRepository) CreateMessage(ctx context.Context, message *Message) erro
 		message.SenderType,
 		nilIfEmpty(message.ExternalID),
 		message.Content,
+		status,
 		message.Payload,
 		message.Metadata,
 		message.CreatedAt,
@@ -424,7 +429,7 @@ func (r *PgRepository) CreateMessage(ctx context.Context, message *Message) erro
 
 func (r *PgRepository) GetMessageByExternalID(ctx context.Context, externalID string) (*Message, error) {
 	query := `
-		SELECT id, dialog_id, sender_type, external_id, content, payload, metadata, created_at
+		SELECT id, dialog_id, sender_type, external_id, content, status, payload, metadata, created_at
 		FROM messages
 		WHERE external_id = $1
 		LIMIT 1
@@ -440,6 +445,7 @@ func (r *PgRepository) GetMessageByExternalID(ctx context.Context, externalID st
 		&message.SenderType,
 		&extID,
 		&message.Content,
+		&message.Status,
 		&payloadJSON,
 		&metadataJSON,
 		&message.CreatedAt,
@@ -458,7 +464,7 @@ func (r *PgRepository) GetMessageByExternalID(ctx context.Context, externalID st
 
 func (r *PgRepository) GetMessagesByDialogID(ctx context.Context, dialogID uuid.UUID, limit, offset int) ([]Message, error) {
 	query := `
-		SELECT id, dialog_id, sender_type, external_id, content, payload, metadata, created_at
+		SELECT id, dialog_id, sender_type, external_id, content, status, payload, metadata, created_at
 		FROM messages
 		WHERE dialog_id = $1
 		ORDER BY created_at DESC
@@ -483,6 +489,7 @@ func (r *PgRepository) GetMessagesByDialogID(ctx context.Context, dialogID uuid.
 			&message.SenderType,
 			&externalID,
 			&message.Content,
+			&message.Status,
 			&payloadJSON,
 			&metadataJSON,
 			&message.CreatedAt,
@@ -503,7 +510,7 @@ func (r *PgRepository) GetMessagesByDialogID(ctx context.Context, dialogID uuid.
 
 func (r *PgRepository) GetLastMessage(ctx context.Context, dialogID uuid.UUID) (*Message, error) {
 	query := `
-		SELECT id, dialog_id, sender_type, external_id, content, payload, metadata, created_at
+		SELECT id, dialog_id, sender_type, external_id, content, status, payload, metadata, created_at
 		FROM messages
 		WHERE dialog_id = $1
 		ORDER BY created_at DESC
@@ -520,6 +527,7 @@ func (r *PgRepository) GetLastMessage(ctx context.Context, dialogID uuid.UUID) (
 		&message.SenderType,
 		&externalID,
 		&message.Content,
+		&message.Status,
 		&payloadJSON,
 		&metadataJSON,
 		&message.CreatedAt,
@@ -542,6 +550,251 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// ListDialogsWithDetails returns dialogs with contact, channel, agent name, and unread count
+func (r *PgRepository) ListDialogsWithDetails(ctx context.Context, filters DialogFilters) ([]DialogListItem, error) {
+	query := `
+		SELECT d.id, d.channel_id, d.contact_id, d.current_agent_id, d.source_ad_id,
+		       d.status, d.tags, d.last_message_at,
+		       c.id, c.external_id, c.name, c.phone, c.email, c.created_at, c.updated_at,
+		       ch.id, ch.platform, ch.is_active, ch.created_at,
+		       COALESCE(u.full_name, ''),
+		       COALESCE((SELECT COUNT(*) FROM messages m WHERE m.dialog_id = d.id AND m.sender_type != 'agent'), 0)
+		FROM dialogs d
+		LEFT JOIN contacts c ON d.contact_id = c.id
+		LEFT JOIN channels ch ON d.channel_id = ch.id
+		LEFT JOIN users u ON d.current_agent_id = u.id
+		WHERE 1=1
+	`
+	args := []interface{}{}
+	argIdx := 1
+
+	if filters.AgentID != nil {
+		query += fmt.Sprintf(` AND d.current_agent_id = $%d`, argIdx)
+		args = append(args, *filters.AgentID)
+		argIdx++
+	}
+
+	if filters.Status != nil {
+		query += fmt.Sprintf(` AND d.status = $%d`, argIdx)
+		args = append(args, *filters.Status)
+		argIdx++
+	}
+
+	if filters.Cursor != "" {
+		query += fmt.Sprintf(` AND d.last_message_at < $%d`, argIdx)
+		args = append(args, filters.Cursor)
+		argIdx++
+	}
+
+	limit := filters.Limit
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+
+	query += fmt.Sprintf(` ORDER BY d.last_message_at DESC LIMIT $%d`, argIdx)
+	args = append(args, limit+1) // fetch one extra to determine hasMore
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list dialogs with details: %w", err)
+	}
+	defer rows.Close()
+
+	var items []DialogListItem
+	for rows.Next() {
+		var item DialogListItem
+		var tagsJSON []byte
+		var contact Contact
+		var channel Channel
+		var contactName, contactPhone, contactEmail, contactExternalID *string
+
+		if err := rows.Scan(
+			&item.ID, &item.ChannelID, &item.ContactID, &item.CurrentAgentID, &item.SourceAdID,
+			&item.Status, &tagsJSON, &item.LastMessageAt,
+			&contact.ID, &contactExternalID, &contactName, &contactPhone, &contactEmail, &contact.CreatedAt, &contact.UpdatedAt,
+			&channel.ID, &channel.Platform, &channel.IsActive, &channel.CreatedAt,
+			&item.AgentName,
+			&item.UnreadCount,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan dialog list item: %w", err)
+		}
+
+		if contactExternalID != nil {
+			contact.ExternalID = *contactExternalID
+		}
+		if contactName != nil {
+			contact.Name = *contactName
+		}
+		if contactPhone != nil {
+			contact.Phone = *contactPhone
+		}
+		if contactEmail != nil {
+			contact.Email = *contactEmail
+		}
+		item.Tags = json.RawMessage(tagsJSON)
+		item.Contact = &contact
+		item.Channel = &channel
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+// GetDialogWithContact returns a dialog with full contact and channel details
+func (r *PgRepository) GetDialogWithContact(ctx context.Context, id uuid.UUID) (*DialogWithDetails, error) {
+	query := `
+		SELECT d.id, d.channel_id, d.contact_id, d.current_agent_id, d.source_ad_id,
+		       d.status, d.tags, d.last_message_at,
+		       c.id, c.external_id, c.name, c.phone, c.email, c.created_at, c.updated_at,
+		       ch.id, ch.platform, ch.credentials, ch.is_active, ch.created_at
+		FROM dialogs d
+		LEFT JOIN contacts c ON d.contact_id = c.id
+		LEFT JOIN channels ch ON d.channel_id = ch.id
+		WHERE d.id = $1
+	`
+
+	var dwd DialogWithDetails
+	var tagsJSON []byte
+	var contact Contact
+	var channel Channel
+	var credentialsJSON []byte
+	var contactName, contactPhone, contactEmail, contactExternalID *string
+
+	err := r.pool.QueryRow(ctx, query, id).Scan(
+		&dwd.ID, &dwd.ChannelID, &dwd.ContactID, &dwd.CurrentAgentID, &dwd.SourceAdID,
+		&dwd.Status, &tagsJSON, &dwd.LastMessageAt,
+		&contact.ID, &contactExternalID, &contactName, &contactPhone, &contactEmail, &contact.CreatedAt, &contact.UpdatedAt,
+		&channel.ID, &channel.Platform, &credentialsJSON, &channel.IsActive, &channel.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get dialog with contact: %w", err)
+	}
+
+	if contactExternalID != nil {
+		contact.ExternalID = *contactExternalID
+	}
+	if contactName != nil {
+		contact.Name = *contactName
+	}
+	if contactPhone != nil {
+		contact.Phone = *contactPhone
+	}
+	if contactEmail != nil {
+		contact.Email = *contactEmail
+	}
+	dwd.Tags = json.RawMessage(tagsJSON)
+	channel.Credentials = json.RawMessage(credentialsJSON)
+	dwd.Contact = &contact
+	dwd.Channel = &channel
+
+	return &dwd, nil
+}
+
+// ListMessagesCursor returns messages for a dialog using cursor-based pagination,
+// with sender_name resolved from contacts (for customer) or users (for agent).
+func (r *PgRepository) ListMessagesCursor(ctx context.Context, cursor MessageCursor) ([]MessageWithSender, error) {
+	limit := cursor.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 30
+	}
+
+	// Join dialog→contact for customer name, and users for agent name
+	query := `
+		SELECT m.id, m.dialog_id, m.sender_type, m.external_id, m.content, m.status, m.payload, m.metadata, m.created_at,
+		       CASE
+		           WHEN m.sender_type = 'customer' THEN COALESCE(ct.name, '')
+		           WHEN m.sender_type = 'agent' THEN COALESCE(u.full_name, '')
+		           WHEN m.sender_type = 'ai' THEN 'AI'
+		           WHEN m.sender_type = 'system' THEN 'System'
+		           ELSE ''
+		       END AS sender_name
+		FROM messages m
+		LEFT JOIN dialogs d ON m.dialog_id = d.id
+		LEFT JOIN contacts ct ON d.contact_id = ct.id
+		LEFT JOIN users u ON m.sender_type = 'agent' AND m.metadata->>'agent_id' IS NOT NULL
+		    AND u.id = (m.metadata->>'agent_id')::uuid
+		WHERE m.dialog_id = $1
+	`
+	args := []interface{}{cursor.DialogID}
+	argIdx := 2
+
+	if cursor.Cursor != "" {
+		query += fmt.Sprintf(` AND (m.created_at, m.id) > ($%d::timestamptz, $%d::uuid)`, argIdx, argIdx+1)
+		parts := splitCursor(cursor.Cursor)
+		if len(parts) == 2 {
+			args = append(args, parts[0], parts[1])
+			argIdx += 2
+		}
+	}
+
+	query += fmt.Sprintf(` ORDER BY m.created_at ASC, m.id ASC LIMIT $%d`, argIdx)
+	args = append(args, limit+1)
+
+	rows, err := r.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list messages with cursor: %w", err)
+	}
+	defer rows.Close()
+
+	var messages []MessageWithSender
+	for rows.Next() {
+		var msg MessageWithSender
+		var externalID *string
+		var payloadJSON, metadataJSON []byte
+
+		if err := rows.Scan(
+			&msg.ID, &msg.DialogID, &msg.SenderType, &externalID,
+			&msg.Content, &msg.Status, &payloadJSON, &metadataJSON, &msg.CreatedAt,
+			&msg.SenderName,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan message: %w", err)
+		}
+
+		if externalID != nil {
+			msg.ExternalID = *externalID
+		}
+		msg.Payload = json.RawMessage(payloadJSON)
+		msg.Metadata = json.RawMessage(metadataJSON)
+		messages = append(messages, msg)
+	}
+
+	return messages, nil
+}
+
+// UpdateMessageStatus updates the delivery status of a message by external_id.
+// Only allows forward transitions: sent → delivered → read (and any → failed).
+func (r *PgRepository) UpdateMessageStatus(ctx context.Context, externalID string, status MessageStatus) error {
+	query := `
+		UPDATE messages SET status = $1
+		WHERE external_id = $2
+		  AND (
+		    $1 = 'failed'
+		    OR (status = 'sent' AND $1 IN ('delivered', 'read'))
+		    OR (status = 'delivered' AND $1 = 'read')
+		  )
+	`
+	_, err := r.pool.Exec(ctx, query, status, externalID)
+	if err != nil {
+		return fmt.Errorf("failed to update message status: %w", err)
+	}
+	return nil
+}
+
+// CreateAgentMessage creates a message sent by an agent
+func (r *PgRepository) CreateAgentMessage(ctx context.Context, message *Message) error {
+	return r.CreateMessage(ctx, message)
+}
+
+func splitCursor(cursor string) []string {
+	// Find the last comma to split "2024-01-01T00:00:00Z,uuid"
+	for i := len(cursor) - 1; i >= 0; i-- {
+		if cursor[i] == ',' {
+			return []string{cursor[:i], cursor[i+1:]}
+		}
+	}
+	return nil
 }
 
 // Dialog Event operations

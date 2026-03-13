@@ -226,9 +226,11 @@ CREATE TABLE messages
     sender_type VARCHAR(50) NOT NULL,                  -- 'customer', 'agent', 'ai', 'system'
     external_id VARCHAR(255),                          -- Platform message ID (mid) для идемпотентности
     content     TEXT,
+    status      VARCHAR(50) NOT NULL     DEFAULT 'sent', -- 'sent', 'delivered', 'read', 'failed'
     payload     JSONB                    DEFAULT '{}', -- Ссылки на медиа (blob), кнопки
     metadata    JSONB                    DEFAULT '{}', -- AI интент, confidence, platform_id
-    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT chk_messages_status CHECK (status IN ('sent', 'delivered', 'read', 'failed'))
 );
 
 -- ==========================================
@@ -238,6 +240,7 @@ CREATE TABLE messages
 -- Чат и сообщения
 CREATE INDEX idx_messages_dialog_at ON messages (dialog_id, created_at DESC);
 CREATE UNIQUE INDEX idx_messages_external_id ON messages (external_id) WHERE external_id IS NOT NULL;
+CREATE INDEX idx_messages_status ON messages (status) WHERE status IN ('sent', 'failed');
 CREATE INDEX idx_dialogs_status ON dialogs (status);
 -- Only one open/pending dialog per contact per channel (prevents race condition duplicates)
 CREATE UNIQUE INDEX idx_dialogs_channel_contact_active ON dialogs (channel_id, contact_id)

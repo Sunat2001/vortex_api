@@ -115,6 +115,10 @@ func (m *mockRepository) GetLastMessage(ctx context.Context, dialogID uuid.UUID)
 	panic("not implemented in test")
 }
 
+func (m *mockRepository) UpdateMessageStatus(ctx context.Context, externalID string, status MessageStatus) error {
+	return nil
+}
+
 // --- Dialog Event operations ---
 
 func (m *mockRepository) CreateDialogEvent(ctx context.Context, event *DialogEvent) error {
@@ -162,6 +166,24 @@ func (m *mockRepository) GetChannelByPlatform(ctx context.Context, platform Plat
 }
 
 func (m *mockRepository) ListChannels(ctx context.Context, platform *Platform) ([]Channel, error) {
+	panic("not implemented in test")
+}
+
+// --- Agent-facing operations ---
+
+func (m *mockRepository) ListDialogsWithDetails(ctx context.Context, filters DialogFilters) ([]DialogListItem, error) {
+	panic("not implemented in test")
+}
+
+func (m *mockRepository) GetDialogWithContact(ctx context.Context, id uuid.UUID) (*DialogWithDetails, error) {
+	panic("not implemented in test")
+}
+
+func (m *mockRepository) ListMessagesCursor(ctx context.Context, cursor MessageCursor) ([]MessageWithSender, error) {
+	panic("not implemented in test")
+}
+
+func (m *mockRepository) CreateAgentMessage(ctx context.Context, message *Message) error {
 	panic("not implemented in test")
 }
 
@@ -292,7 +314,7 @@ func minimalWAStatusPayload(msgID, status string) json.RawMessage {
 
 func TestProcessIncomingWebhook_UnsupportedPlatform(t *testing.T) {
 	repo := &mockRepository{}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   Platform("telegram"),
@@ -317,7 +339,7 @@ func TestProcessIncomingWebhook_InvalidJSON(t *testing.T) {
 			return newTestChannel(PlatformWhatsApp), nil
 		},
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -340,7 +362,7 @@ func TestProcessIncomingWebhook_NoChannel(t *testing.T) {
 			return nil, channelErr
 		},
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -360,7 +382,7 @@ func TestProcessIncomingWebhook_NoChannel(t *testing.T) {
 func TestProcessIncomingWebhook_HappyPath_TextMessage(t *testing.T) {
 	channel := newTestChannel(PlatformWhatsApp)
 	repo := buildSuccessRepo(channel)
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -389,7 +411,7 @@ func TestProcessIncomingWebhook_HappyPath_TextMessage(t *testing.T) {
 func TestProcessIncomingWebhook_MetadataMerging(t *testing.T) {
 	channel := newTestChannel(PlatformWhatsApp)
 	repo := buildSuccessRepo(channel)
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -432,7 +454,7 @@ func TestProcessIncomingWebhook_NilParserMetadata(t *testing.T) {
 	repo.onGetChannelByPlatform = func(_ context.Context, _ Platform) (*Channel, error) {
 		return fbChannel, nil
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	// Minimal Facebook messaging webhook (entry[].messaging[] format).
 	fbPayload := json.RawMessage(`{
@@ -484,7 +506,7 @@ func TestProcessIncomingWebhook_NilPayloadBecomesEmptyObject(t *testing.T) {
 	// "unsupported" type with nil Unsupported field → parser sets Payload to nil.
 	channel := newTestChannel(PlatformWhatsApp)
 	repo := buildSuccessRepo(channel)
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	payload := json.RawMessage(`{
 		"entry":[{
@@ -544,7 +566,7 @@ func TestProcessIncomingWebhook_DuplicateMessage(t *testing.T) {
 			return ErrMessageAlreadyExists
 		},
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -576,7 +598,7 @@ func TestProcessIncomingWebhook_CreateMessageError(t *testing.T) {
 		},
 		onCreateMessage: func(_ context.Context, _ *Message) error { return dbErr },
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	// processMessage logs the error and continues (does not propagate it to
 	// ProcessIncomingWebhook's caller).  The response still has 0 messages created.
@@ -604,7 +626,7 @@ func TestProcessIncomingWebhook_UpsertContactError(t *testing.T) {
 		},
 		onUpsertContact: func(_ context.Context, _ *Contact) error { return contactErr },
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -636,7 +658,7 @@ func TestProcessIncomingWebhook_GetOrCreateDialogError(t *testing.T) {
 			return nil, dialogErr
 		},
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -672,7 +694,7 @@ func TestProcessIncomingWebhook_StatusUpdate_HappyPath(t *testing.T) {
 			return nil
 		},
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -714,7 +736,7 @@ func TestProcessIncomingWebhook_StatusUpdate_MessageNotFound(t *testing.T) {
 			return nil, notFoundErr
 		},
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -738,7 +760,7 @@ func TestProcessIncomingWebhook_EmptyEvents(t *testing.T) {
 			return channel, nil
 		},
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -774,7 +796,7 @@ func TestProcessIncomingWebhook_UpdateDialogLastMessageAt_NonFatal(t *testing.T)
 		},
 		onCreateDialogEvent: func(_ context.Context, _ *DialogEvent) error { return nil },
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -812,7 +834,7 @@ func TestProcessIncomingWebhook_CreateDialogEvent_NonFatal(t *testing.T) {
 			return eventErr
 		},
 	}
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	resp, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -832,7 +854,7 @@ func TestProcessIncomingWebhook_CreateDialogEvent_NonFatal(t *testing.T) {
 func TestProcessIncomingWebhook_MessageStoredAsSenderTypeCustomer(t *testing.T) {
 	channel := newTestChannel(PlatformWhatsApp)
 	repo := buildSuccessRepo(channel)
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	_, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -851,7 +873,7 @@ func TestProcessIncomingWebhook_MessageStoredAsSenderTypeCustomer(t *testing.T) 
 func TestProcessIncomingWebhook_MessageExternalIDSet(t *testing.T) {
 	channel := newTestChannel(PlatformWhatsApp)
 	repo := buildSuccessRepo(channel)
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	_, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -870,7 +892,7 @@ func TestProcessIncomingWebhook_MessageExternalIDSet(t *testing.T) {
 func TestProcessIncomingWebhook_TextMessageContent(t *testing.T) {
 	channel := newTestChannel(PlatformWhatsApp)
 	repo := buildSuccessRepo(channel)
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	_, err := uc.ProcessIncomingWebhook(context.Background(), &ProcessWebhookRequest{
 		Platform:   PlatformWhatsApp,
@@ -879,7 +901,7 @@ func TestProcessIncomingWebhook_TextMessageContent(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotNil(t, repo.createMessageArg)
-	assert.Equal(t, "[Text]", repo.createMessageArg.Content)
+	assert.Equal(t, "body text here", repo.createMessageArg.Content)
 }
 
 // ---------------------------------------------------------------------------
@@ -889,7 +911,7 @@ func TestProcessIncomingWebhook_TextMessageContent(t *testing.T) {
 func TestProcessIncomingWebhook_ZeroTimestampDefaultsToNow(t *testing.T) {
 	channel := newTestChannel(PlatformWhatsApp)
 	repo := buildSuccessRepo(channel)
-	uc := NewUsecase(repo, zap.NewNop())
+	uc := NewUsecase(repo, nil, zap.NewNop())
 
 	// Timestamp "0" will be parsed to zero by parseUnixString → falls back to time.Now().
 	payload := json.RawMessage(`{

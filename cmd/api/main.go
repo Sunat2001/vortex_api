@@ -17,6 +17,7 @@ import (
 	"github.com/voronka/backend/internal/app"
 	"github.com/voronka/backend/internal/auth"
 	authDelivery "github.com/voronka/backend/internal/auth/delivery"
+	"github.com/voronka/backend/internal/chat"
 	chatDelivery "github.com/voronka/backend/internal/chat/delivery"
 	"github.com/voronka/backend/internal/shared/middleware"
 )
@@ -91,7 +92,23 @@ func main() {
 		webhookHandler := chatDelivery.NewWebhookHandler(infra.StreamManager, &cfg.Webhooks, logger)
 		webhookHandler.RegisterRoutes(v1)
 
-		// TODO: Add chat routes (dialog, messages, etc.)
+		// WebSocket hub (must be created before usecase for notifier injection)
+		wsHub := chatDelivery.NewHub(logger)
+		go wsHub.Run()
+		hubNotifier := chatDelivery.NewHubNotifier(wsHub, logger)
+
+		// Chat routes (dialogs, messages)
+		chatRepo := chat.NewRepository(infra.PgPool)
+		chatUsecase := chat.NewUsecase(chatRepo, hubNotifier, logger)
+		chatHandler := chatDelivery.NewHTTPHandler(chatUsecase, logger)
+		chatHandler.RegisterRoutes(v1, authMw)
+
+		wsHandler := chatDelivery.NewWSHandler(wsHub, logger)
+		wsHandler.RegisterRoutes(v1, authMw)
+
+		// Subscribe to worker events via Redis Pub/Sub → push to local Hub
+		go chatDelivery.StartPubSubSubscriber(ctx, infra.RedisClient, wsHub, logger)
+
 		// TODO: Add ads routes
 		// TODO: Add catalog routes
 	}

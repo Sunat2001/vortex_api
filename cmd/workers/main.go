@@ -14,6 +14,7 @@ import (
 
 	"github.com/voronka/backend/internal/app"
 	"github.com/voronka/backend/internal/chat"
+	chatDelivery "github.com/voronka/backend/internal/chat/delivery"
 )
 
 func main() {
@@ -41,7 +42,8 @@ func main() {
 
 	// Initialize repositories and usecases
 	chatRepo := chat.NewRepository(infra.PgPool)
-	chatUsecase := chat.NewUsecase(chatRepo, logger)
+	pubsubNotifier := chatDelivery.NewPubSubNotifier(infra.RedisClient, logger)
+	chatUsecase := chat.NewUsecase(chatRepo, pubsubNotifier, logger)
 
 	// Create worker context
 	workerCtx, workerCancel := context.WithCancel(context.Background())
