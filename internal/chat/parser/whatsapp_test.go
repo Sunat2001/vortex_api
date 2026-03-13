@@ -99,7 +99,7 @@ func TestWhatsAppParser_Parse_TextMessage(t *testing.T) {
 	assert.Equal(t, "Alice", msg.ContactName)
 	assert.Equal(t, "12345", msg.ContactPhone)
 	assert.Equal(t, MediaTypeText, msg.MediaType)
-	assert.Equal(t, "[Text]", msg.Content)
+	assert.Equal(t, "Hello, world!", msg.Content)
 
 	// Payload must contain {"body":"Hello, world!"}
 	payload := mustUnmarshalMap(t, msg.Payload)
@@ -136,8 +136,8 @@ func TestWhatsAppParser_Parse_ImageMessage_NoCaption(t *testing.T) {
 
 	msg := events[0].Message
 	assert.Equal(t, MediaTypeImage, msg.MediaType)
-	// No caption — falls back to placeholder.
-	assert.Equal(t, "[Image]", msg.Content)
+	// No caption — content is empty, media type is in metadata.
+	assert.Equal(t, "", msg.Content)
 
 	payload := mustUnmarshalMap(t, msg.Payload)
 	assert.Equal(t, "media-id-1", payload["id"])
@@ -169,8 +169,8 @@ func TestWhatsAppParser_Parse_ImageMessage_WithCaption(t *testing.T) {
 
 	msg := events[0].Message
 	assert.Equal(t, MediaTypeImage, msg.MediaType)
-	// Caption present — content is the caption.
-	assert.Equal(t, "Look at this!", msg.Content)
+	// Non-text types: content is always empty, data is in payload only.
+	assert.Equal(t, "", msg.Content)
 }
 
 // ---- Video message ------------------------------------------------------------
@@ -199,7 +199,7 @@ func TestWhatsAppParser_Parse_VideoMessage(t *testing.T) {
 
 	msg := events[0].Message
 	assert.Equal(t, MediaTypeVideo, msg.MediaType)
-	assert.Equal(t, "[Video]", msg.Content)
+	assert.Equal(t, "", msg.Content)
 	payload := mustUnmarshalMap(t, msg.Payload)
 	assert.Equal(t, "vid-media-1", payload["id"])
 }
@@ -231,8 +231,8 @@ func TestWhatsAppParser_Parse_AudioMessage(t *testing.T) {
 
 	msg := events[0].Message
 	assert.Equal(t, MediaTypeAudio, msg.MediaType)
-	// Audio always uses placeholder, regardless of caption.
-	assert.Equal(t, "[Audio]", msg.Content)
+	// Audio has no text content.
+	assert.Equal(t, "", msg.Content)
 	payload := mustUnmarshalMap(t, msg.Payload)
 	assert.Equal(t, "aud-media-1", payload["id"])
 }
@@ -265,8 +265,8 @@ func TestWhatsAppParser_Parse_DocumentMessage(t *testing.T) {
 
 	msg := events[0].Message
 	assert.Equal(t, MediaTypeDocument, msg.MediaType)
-	// Caption present on document — used as content.
-	assert.Equal(t, "Invoice Q4", msg.Content)
+	// Non-text types: content is always empty.
+	assert.Equal(t, "", msg.Content)
 	payload := mustUnmarshalMap(t, msg.Payload)
 	assert.Equal(t, "invoice.pdf", payload["filename"])
 }
@@ -295,7 +295,7 @@ func TestWhatsAppParser_Parse_DocumentMessage_NoCaption(t *testing.T) {
 	require.Len(t, events, 1)
 
 	msg := events[0].Message
-	assert.Equal(t, "[Document]", msg.Content)
+	assert.Equal(t, "", msg.Content)
 }
 
 // ---- Location message ---------------------------------------------------------
@@ -326,7 +326,7 @@ func TestWhatsAppParser_Parse_LocationMessage(t *testing.T) {
 
 	msg := events[0].Message
 	assert.Equal(t, MediaTypeLocation, msg.MediaType)
-	assert.Equal(t, "[Location]", msg.Content)
+	assert.Equal(t, "", msg.Content)
 
 	payload := mustUnmarshalMap(t, msg.Payload)
 	assert.InDelta(t, 40.7128, payload["latitude"], 0.0001)
@@ -746,19 +746,3 @@ func TestWhatsAppParser_Parse_SenderNotInContacts(t *testing.T) {
 	assert.Equal(t, "00001", msg.ContactPhone)
 }
 
-// ---- captionOrPlaceholder unit test -----------------------------------------
-
-func TestCaptionOrPlaceholder_NilMedia(t *testing.T) {
-	result := captionOrPlaceholder(nil, "[Fallback]")
-	assert.Equal(t, "[Fallback]", result)
-}
-
-func TestCaptionOrPlaceholder_EmptyCaption(t *testing.T) {
-	result := captionOrPlaceholder(&waMedia{Caption: ""}, "[Fallback]")
-	assert.Equal(t, "[Fallback]", result)
-}
-
-func TestCaptionOrPlaceholder_WithCaption(t *testing.T) {
-	result := captionOrPlaceholder(&waMedia{Caption: "Nice pic"}, "[Fallback]")
-	assert.Equal(t, "Nice pic", result)
-}

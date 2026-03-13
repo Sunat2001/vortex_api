@@ -20,25 +20,32 @@ type TokenValidator interface {
 	ValidateAccessToken(tokenString string) (userID uuid.UUID, deviceID string, roles []string, err error)
 }
 
-// AuthMiddleware validates JWT tokens and extracts user information
+// AuthMiddleware validates JWT tokens and extracts user information.
+// Supports both "Authorization: Bearer <token>" header and "?token=<token>" query param
+// (the query param fallback is useful for WebSocket connections where headers may not be supported).
 func AuthMiddleware(validator TokenValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var token string
+
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+		if authHeader != "" {
+			// Extract token from "Bearer <token>"
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				token = parts[1]
+			}
+		}
+
+		// Fallback to query param (for WebSocket upgrade requests)
+		if token == "" {
+			token = c.Query("token")
+		}
+
+		if token == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization"})
 			c.Abort()
 			return
 		}
-
-		// Extract token from "Bearer <token>"
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
-			c.Abort()
-			return
-		}
-
-		token := parts[1]
 
 		userID, deviceID, roles, err := validator.ValidateAccessToken(token)
 		if err != nil {
